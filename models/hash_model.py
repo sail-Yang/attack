@@ -129,7 +129,7 @@ class HashModel:
     best_mAP = 0
     for epoch in range(num_epochs):
       train_loss = 0
-      for image, label, _ in tqdm(train_loader):
+      for image, label, _ in tqdm(train_loader,ascii=True):
         image = image.cuda()
         label = label.cuda()
         
@@ -149,7 +149,7 @@ class HashModel:
         if map_ > best_mAP:
           best_mAP = map_
           # save the paramters of the model
-          file_name = f"{self.model_name}_{self.args.backbone}_{self.args.dataset}_{str(self.conf.num_bits)}.pt"
+          file_name = f"{self.model_name}_{self.args.backbone}_{self.args.dataset}_{str(self.args.num_bits)}.pt"
           path = os.path.join(save_path, self.model_name, file_name)
           torch.save(model.state_dict(), path)
 
@@ -158,7 +158,7 @@ class HashModel:
   
   def load_model(self):
     file_name = (
-      f"{self.model_name}_{self.args.backbone}_{self.args.dataset}_{str(self.conf.num_bits)}.pt"
+      f"{self.model_name}_{self.args.backbone}_{self.args.dataset}_{str(self.args.num_bits)}.pt"
     )
     save_path = self.args.save_path
     path = os.path.join(save_path, file_name)

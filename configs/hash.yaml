@@ -19,7 +19,7 @@ crop_size: 224
 num_workers: 4
 topK: 5000
 n_class: 10
-data_path: "/opt/data/private/workspace/fyang/data"
+data_path: "/data2/fyang/data"
 txt_path: "./data/"
 
 ### Deep Hash settings
