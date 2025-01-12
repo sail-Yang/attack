@@ -1,0 +1,32 @@
+import logging
+import time
+import os
+
+def create_hashing_logger(args):
+  logger_file_path = args.log_path
+  hash_model = args.hash_model
+  backbone = args.backbone
+  dataset = args.dataset
+  num_bits = args.num_bits
+  log_time = time.strftime('%Y-%m-%d-%H-%M')
+  if not os.path.exists(logger_file_path):
+    os.makedirs(logger_file_path)
+  log_name = f"{backbone}_{dataset}_{num_bits}_{log_time}.log"
+  log_path = os.path.join(logger_file_path, hash_model, log_name)
+  
+  logger = logging.getLogger() 
+  logger.setLevel(logging.INFO) 
+  
+  file_handler = logging.FileHandler(log_path)
+  console_handler = logging.StreamHandler()
+  
+  # format
+  formatter = logging.Formatter(
+    "%(asctime)s %(levelname)s: %(message)s"
+  )
+  file_handler.setFormatter(formatter)
+  console_handler.setFormatter(formatter)
+  logger.addHandler(file_handler)
+  logger.addHandler(console_handler)
+  
+  return logger

@@ -1,0 +1,29 @@
+### Model params
+# AlexNet/ResNet/VGG
+backbone: "ResNet50"
+lr: 1e-4
+epoch: 250
+alpha: 0.05
+weight_decay: 10 ** -5
+momentum: 0.9
+num_bits: 64
+batch_size: 256
+checkpoing: 10
+
+### Dataset params
+# coco/nuswide/flick/imagenet/cifar10/flickr
+dataset: "coco"
+resize_size: 256
+crop_size: 224
+num_workers: 4
+topK: 5000
+n_class: 10
+data_path: "/opt/data/private/workspace/fyang/data"
+txt_path: "./data/"
+
+### Deep Hash settings
+hash_model: "HashNet"
+
+### other configs
+gpu: 0
+seed: 2021
