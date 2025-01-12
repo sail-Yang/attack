@@ -16,7 +16,7 @@ def calc_map(qb, db, ql, dl, top_k=None):
   '''
   cnt_q = qb.shape[0]
   _map = 0.0
-  for i in tqdm(range(cnt_q)):
+  for i in tqdm(range(cnt_q),ascii=True):
     gt = ql[i] @ dl.T > 0
     hd = calc_hamming_dist(qb[i], db)
     idx = torch.argsort(hd, stable=True)
@@ -37,7 +37,7 @@ def get_codes_and_labels(loader, model, p=None):
   codes = []
   labels_ = []
   with torch.no_grad():
-    for images, labels, _ in tqdm(loader):
+    for images, labels, _ in tqdm(loader,ascii=True):
       images = images.cuda()
       if p is not None:
         images_p = torch.add(images, p)

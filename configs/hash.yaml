@@ -2,14 +2,13 @@
 # AlexNet/ResNet/VGG
 backbone: "ResNet34"
 lr: 1e-4
-epoch: 250
+epoch: 200
 alpha: 0.05
 weight_decay: 10 ** -5
 momentum: 0.9
 num_bits: 64
 batch_size: 256
-# checkpoint: 10
-checkpoint: 5
+checkpoint: 10
 
 ### Dataset params
 # coco/nuswide/flick/imagenet/cifar10/flickr
@@ -24,11 +23,11 @@ txt_path: "./data/"
 
 ### Deep Hash settings
 hash_model: "HashNet"
-
+train: True
+test: True
 hashnet_params:
   alpha: 0.1
   step_continuation: 20
-
 csq_params:
   lambda_: 0.0001
 
