@@ -9,8 +9,9 @@ def create_hashing_logger(args):
   dataset = args.dataset
   num_bits = args.num_bits
   log_time = time.strftime('%Y-%m-%d-%H-%M')
-  if not os.path.exists(logger_file_path):
-    os.makedirs(logger_file_path)
+  log_dir_path = os.path.join(logger_file_path, hash_model)
+  if not os.path.exists(log_dir_path):
+    os.makedirs(log_dir_path)
   log_name = f"{backbone}_{dataset}_{num_bits}_{log_time}.log"
   log_path = os.path.join(logger_file_path, hash_model, log_name)
   
