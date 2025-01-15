@@ -1,13 +1,13 @@
 ### Model params
 # AlexNet/ResNet/VGG
-backbone: "ResNet50"
+backbone: "ResNet34"
 lr: 1e-4
 epoch: 250
 alpha: 0.05
 weight_decay: 10 ** -5
 momentum: 0.9
 num_bits: 64
-batch_size: 256
+batch_size: 32
 checkpoing: 10
 
 ### Dataset params
@@ -18,12 +18,24 @@ crop_size: 224
 num_workers: 4
 topK: 5000
 n_class: 10
-data_path: "/opt/data/private/workspace/fyang/data"
+data_path: "/data2/fyang/data"
 txt_path: "./data/"
 
-### Deep Hash settings
-hash_model: "HashNet"
+### attack settings
+hash_model: "CSQ"
+attack_method: "dhta"
+n_t: 9
+epsilon: 8 / 255
+iteration: 100
+transfer: False
+trans_config:
+  t_hash_model: "DPSH"
+  t_bit: 32
+  t_backbone: "VGG11"
 
 ### other configs
+log_path: "./log/attack"
+save_path: "./save/attack"
+hash_save_path: "./save/hashing"
 gpu: 0
 seed: 2021

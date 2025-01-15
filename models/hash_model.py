@@ -107,7 +107,7 @@ class HashModel:
   
   def train(self, train_loader, val_loader, database_loader):
     num_epochs = self.args.epoch
-    save_path = self.args.save_path
+    save_path = self.args.hash_save_path
     if self.model_name == "HashNet":
       alpha = self.args.hashnet_params.alpha
       critertion = HashNetLoss(alpha = alpha)
@@ -157,17 +157,27 @@ class HashModel:
           torch.save(model.state_dict(), path)
 
         logging.info(f"mAP: {map_: .4f} best_mAP: {best_mAP:.4f}")
-        # print(f"mAP: {map_: .4f} best_mAP: {best_mAP:.4f}")
   
   def load_model(self):
     file_name = (
       f"{self.model_name}_{self.args.backbone}_{self.args.dataset}_{str(self.args.num_bits)}.pt"
     )
-    save_path = self.args.save_path
+    save_path = self.args.hash_save_path
     path = os.path.join(save_path, self.args.hash_model, file_name)
     checkpoint = torch.load(path)
     self.model.load_state_dict(checkpoint)
     return self.model
+
+  @staticmethod
+  def load_t_model(model_path):
+    '''
+    load attacked model
+    '''
+    model = torch.load(model_path)
+    if torch.cuda.is_available():
+      model = model.cuda()
+    model.eval()
+    return model
 
   def test_model(self, test_loader, database_loader):
     model = self.model.eval().cuda()

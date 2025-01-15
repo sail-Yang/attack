@@ -86,9 +86,12 @@ def get_data(args):
     dset_database = HashingDataset_part(args.data_path, args.txt_path, "database_img.txt","database_label.txt",image_transform(args.resize_size, args.crop_size, False))
     dset_train = HashingDataset_part(args.data_path, args.txt_path, "train_img.txt","train_label.txt",image_transform(args.resize_size, args.crop_size, True))
     dset_test = HashingDataset_part(args.data_path, args.txt_path, "test_img.txt","test_label.txt",image_transform(args.resize_size, args.crop_size, False))
-    
+  
   database_loader = DataLoader(dset_database, batch_size=args.batch_size, shuffle=False, num_workers=args.num_workers)
   train_loader = DataLoader(dset_train, batch_size=args.batch_size, shuffle=True, num_workers=args.num_workers)
   test_loader = DataLoader(dset_test, batch_size=args.batch_size, shuffle=False, num_workers=args.num_workers)
-  
-  return train_loader, test_loader, database_loader
+  num_database, num_test, num_train = len(dset_database), len(dset_test), len(dset_train)
+  return train_loader, test_loader, database_loader, num_train, num_test, num_database
+
+def get_labels(args):
+  pass

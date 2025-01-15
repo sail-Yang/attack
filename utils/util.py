@@ -2,6 +2,7 @@ import torch
 import os
 import random
 import numpy as np
+from tqdm import tqdm
 
 def seed_setting(seed=2021):
   """
@@ -15,3 +16,15 @@ def seed_setting(seed=2021):
   torch.cuda.manual_seed_all(seed)
   # torch.backends.cudnn.benchmark = False # False make training process too slow!
   torch.backends.cudnn.deterministic = True
+
+
+def generateCode(model, data_loader, num_data, bit, use_gpu=True):
+  '''
+  generate hash code for dataset
+  '''  
+  B = np.zeros([num_data, bit], dtype=np.float32)
+  for image, _, ind in tqdm(data_loader,ascii=True):
+    image = image.cuda()
+    output = model(image)
+    B[ind.numpy(), :] = torch.sign(output.cpu().data).numpy()
+  return B  
