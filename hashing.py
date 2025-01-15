@@ -21,4 +21,5 @@ if __name__ == "__main__":
   
   if args.test:
     logger.info(f"{args.hash_model}, {args.backbone}, {args.dataset}, {args.num_bits} bits, testing...")
+    model.load_model()
     model.test_model(test_loader, database_loader)

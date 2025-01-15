@@ -164,7 +164,7 @@ class HashModel:
       f"{self.model_name}_{self.args.backbone}_{self.args.dataset}_{str(self.args.num_bits)}.pt"
     )
     save_path = self.args.save_path
-    path = os.path.join(save_path, file_name)
+    path = os.path.join(save_path, self.args.hash_model, file_name)
     checkpoint = torch.load(path)
     self.model.load_state_dict(checkpoint)
     return self.model
@@ -173,6 +173,5 @@ class HashModel:
     model = self.model.eval().cuda()
     map_, data = validate(test_loader, database_loader, model, top_k=5000)
     logging.info(f"Test mAP: {map_:.4f}")    
-    
     
     
