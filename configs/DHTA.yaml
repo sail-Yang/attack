@@ -12,7 +12,7 @@ checkpoing: 10
 
 ### Dataset params
 # coco/nuswide/flick/imagenet/cifar10/flickr
-dataset: "coco"
+dataset: "nuswide"
 resize_size: 256
 crop_size: 224
 num_workers: 4
