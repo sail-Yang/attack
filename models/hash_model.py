@@ -97,13 +97,15 @@ class HashModel:
   
   def build_model(self):
     if "ResNet" in self.args.backbone:
-      self.model = ResNet(self.args.num_bits, self.args.backbone)
+      self.model = ResNet(self.args.num_bits,self.args.backbone)
     elif "VGG" in self.args.backbone:
       self.model = VGG(self.args.num_bits, self.args.backbone)
     elif "AlexNet" in self.args.backbone:
       self.model = AlexNet(self.args.num_bits)
     else:
       raise NotImplementedError
+    if torch.cuda.is_available():
+      self.model = self.model.cuda()
   
   def train(self, train_loader, val_loader, database_loader):
     num_epochs = self.args.epoch
@@ -145,7 +147,7 @@ class HashModel:
       logging.info(f"epoch: {epoch + 1} loss: {train_loss:.4f}")
       
       if (epoch + 1) % self.args.checkpoint == 0:
-        map_, _ = validate(val_loader, database_loader, model, self.args.topK)
+        map_, _ = validate_hash(val_loader, database_loader, model, self.args.topK)
         if map_ > best_mAP:
           best_mAP = map_
           # save the paramters of the model
@@ -181,7 +183,7 @@ class HashModel:
 
   def test_model(self, test_loader, database_loader):
     model = self.model.eval().cuda()
-    map_, data = validate(test_loader, database_loader, model, top_k=5000)
+    map_, data = validate_hash(test_loader, database_loader, model, top_k=5000)
     logging.info(f"Test mAP: {map_:.4f}")    
     
     

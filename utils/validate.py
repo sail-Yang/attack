@@ -1,63 +1,44 @@
 import torch
 import torch.nn.functional as F
 from tqdm import tqdm
+import numpy as np
 
-def calc_hamming_dist(b1, b2):
-  '''
-    Hamming Disctance
-  '''
-  num_bits = b2.shape[1]
-  hamming_dist = 0.5 * (num_bits - b1 @ b2.t())
-  return hamming_dist
+def compute_result(dataloader, net):
+    bs, clses = [], []
+    net.eval()
+    for img, cls, _ in tqdm(dataloader):
+        clses.append(cls)
+        bs.append((net(img.cuda())).data.cpu())
+    return torch.cat(bs).sign(), torch.cat(clses)
 
-def calc_map(qb, db, ql, dl, top_k=None):
-  '''
-    calculate map
-  '''
-  cnt_q = qb.shape[0]
-  _map = 0.0
-  for i in tqdm(range(cnt_q),ascii=True):
-    gt = ql[i] @ dl.T > 0
-    hd = calc_hamming_dist(qb[i], db)
-    idx = torch.argsort(hd, stable=True)
-    gt = gt[idx][:top_k]
-    cnt = torch.sum(gt).item()
+def CalcHammingDist(B1, B2):
+    q = B2.shape[1]
+    distH = 0.5 * (q - np.dot(B1, B2.transpose()))
+    return distH
+  
+def CalcTopMap(rB, qB, retrievalL, queryL, topk):
+    num_query = queryL.shape[0]
+    topkmap = 0
+    for iter in tqdm(range(num_query)):
+        gnd = (np.dot(queryL[iter, :], retrievalL.transpose()) > 0).astype(np.float32)
+        hamm = CalcHammingDist(qB[iter, :], rB)
+        ind = np.argsort(hamm)
+        gnd = gnd[ind]
 
-    if cnt == 0:
-      continue
+        tgnd = gnd[0:topk]
+        tsum = np.sum(tgnd).astype(int)
+        if tsum == 0:
+            continue
+        count = np.linspace(1, tsum, tsum)
 
-    ap = torch.mean(
-      torch.linspace(1, cnt, cnt) / (gt.nonzero(as_tuple=True)[0] + 1)
-    )
-    _map += ap
-  _map /= cnt_q
-  return _map
+        tindex = np.asarray(np.where(tgnd == 1)) + 1.0
+        topkmap_ = np.mean(count / (tindex))
+        topkmap = topkmap + topkmap_
+    topkmap = topkmap / num_query
+    return topkmap
 
-def get_codes_and_labels(loader, model, p=None):
-  codes = []
-  labels_ = []
-  with torch.no_grad():
-    for images, labels, _ in tqdm(loader,ascii=True):
-      images = images.cuda()
-      if p is not None:
-        images_p = torch.add(images, p)
-        code = model(images_p).data.cpu()
-        codes.append(code)
-        labels_.append(labels)
-  return torch.cat(codes).sign(), torch.cat(labels_)
-
-def validate(test_loader, database_loader, model, top_k=None):
-  qb, ql = get_codes_and_labels(test_loader, model, top_k)
-  db, dl = get_codes_and_labels(database_loader, model, top_k)
-
-  mAP = calc_map(qb, db, ql, dl, top_k=top_k)
-
-  return mAP, (qb, db, ql, dl)
-
-def attack_validate(test_loader, database_loader, tl, model, p=None, top_k=None):
-  qb, _ = get_codes_and_labels(test_loader, model, p)
-  db, dl = get_codes_and_labels(database_loader, model, None)
-
-  mAP = calc_map(qb, db, tl, dl, top_k=1)
-
-  return mAP, (qb, db, tl, dl)
+def validate_hash(test_loader, database_loader, model, top_k=None):
+  tst_binary, tst_label = compute_result(test_loader, model)
+  trn_binary, trn_label = compute_result(database_loader, model)
+  mAP = CalcTopMap(trn_binary.numpy(), tst_binary.numpy(), trn_label.numpy(), tst_label.numpy(), top_k)
+  return mAP, (tst_binary, trn_binary, tst_label, trn_label)
