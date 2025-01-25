@@ -1,10 +1,12 @@
 import torch
 from omegaconf import OmegaConf
+import torch.nn.functional as F
 from models.hash_model import HashModel
 from utils.config import load_config
 from utils.data_provider import get_data
 from utils.log import create_attack_hashing_logger
 from utils.util import *
+from utils.validate import CalcTopMap
 import collections
 import pandas as pd
 
@@ -108,9 +110,8 @@ def get_labels_and_codes(args, model, t_model, database_code_path, t_database_co
     database_txt_path = os.path.join(args.txt_path, "database_label.txt")
     target_labels = get_target_labels(database_txt_path, num_test, args.n_t)
     np.savetxt(target_label_path, target_labels, fmt="%d")
-  target_labels_str = [''.join(label) for label in target_labels.astype(str)]
   
-  return database_hash, t_database_hash, target_labels_str
+  return database_hash, t_database_hash, target_labels
 
 def vote_anchor_code(hash_codes):
   '''
@@ -122,6 +123,32 @@ def vote_anchor_code(hash_codes):
   '''
   return torch.sign(torch.sum(hash_codes, dim=0))
 
+def target_adv_loss(noisy_output, target_hash):
+  loss = -torch.mean(noisy_output * target_hash)
+  return loss
+
+def target_hash_adv(model, query, target_hash, epsilon, alpha=1, iteration=2000, randomize = False):
+  '''
+    iterate attack
+  '''
+  delta = torch.zeros_like(query, requires_grad=True).cuda()
+  if randomize:
+    delta.uniform_(-epsilon, epsilon)
+    delta.data = (query.data + delta.data).clamp(0, 1) - query.data
+  for i in range(iteration):
+    # noisy_output = model(query + delta, factor)
+    noisy_output = model(query + delta)
+    loss = target_adv_loss(noisy_output, target_hash)
+    loss.backward()
+    
+    delta.data = delta - alpha * delta.grad.detach()
+    delta.data = delta.data.clamp(-epsilon, epsilon)
+    delta.data = (query.data + delta.data).clamp(0, 1) - query.data
+    delta.grad.zero_()
+  
+  return query + delta.detach()
+    
+    
 
 if __name__ == "__main__":
   conf_root = "./configs/DHTA.yaml"
@@ -130,7 +157,8 @@ if __name__ == "__main__":
   logger = create_attack_hashing_logger(args)
   train_loader, test_loader, database_loader, num_train, num_test, num_database = get_data(args)
   model, t_model, database_code_path, t_database_code_path, target_label_path, test_code_path, t_bit = config_dhta(args)
-  database_hash, t_database_hash, target_labels_str = get_labels_and_codes(args, model, t_model, database_code_path, t_database_code_path, target_label_path, database_loader, num_test, num_database)
+  database_hash, t_database_hash, target_labels = get_labels_and_codes(args, model, t_model, database_code_path, t_database_code_path, target_label_path, database_loader, num_test, num_database)
+  target_labels_str = [''.join(label) for label in target_labels.astype(str)]
   
   # 获取database labels
   database_txt_path = os.path.join(args.txt_path, "database_label.txt")
@@ -155,4 +183,25 @@ if __name__ == "__main__":
       anchor_code = anchor_code.view(1, args.num_bits)
       anchor_codes[i, :] = anchor_code
     query_anchor_codes[it*args.batch_size:it*args.batch_size+batch_size_] = anchor_codes.numpy()
-    
+    query_adv = target_hash_adv(model, image, anchor_codes.cuda(), epsilon=args.epsilon, iteration=args.iteration)
+    if args.transfer:
+      query_code = generateHash(t_model, query_adv)
+    else:
+      query_code = generateHash(model, query_adv)
+    # 生成索引数组
+    u_ind = np.linspace(it * args.batch_size, np.min((num_test, (it+1) * args.batch_size)) - 1, batch_size_, dtype=int)
+    qB[u_ind, :] = query_code
+    perceptibility += F.mse_loss(image, query_adv).data * batch_size_
+
+np.savetxt(test_code_path, qB, fmt="%d")
+database_labels_int = get_labels_int(database_txt_path)
+test_txt_path = os.path.join(args.txt_path, "test_label.txt")
+test_labels_int = get_labels_int(test_txt_path)
+
+logger.info("perceptibility: {:.7f}".format(torch.sqrt(perceptibility/num_test)))
+anchor_map = CalcTopMap(t_database_hash, query_anchor_codes, database_labels_int, target_labels, topk=args.topK)
+logger.info("anchor codes t-MAP[retrieval database]: {:.7f}".format(anchor_map))
+t_map = CalcTopMap(t_database_hash, qB, database_labels_int, target_labels, topk=args.topK)
+logger.info("t-MAP[retrieval database]: {:.7f}".format(t_map))
+map = CalcTopMap(t_database_hash, qB, database_labels_int, test_labels_int, topk=args.topK)
+logger.info("MAP[retrieval database]: {:.7f}".format(map))

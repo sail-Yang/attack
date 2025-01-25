@@ -1,8 +1,8 @@
 ### Model params
 # AlexNet/ResNet/VGG
-backbone: "ResNet34"
+backbone: "ResNet50"
 lr: 1e-4
-epoch: 250
+epoch: 100
 alpha: 0.05
 weight_decay: 10 ** -5
 momentum: 0.9
@@ -22,10 +22,10 @@ data_path: "/data2/fyang/data"
 txt_path: "./data/"
 
 ### attack settings
-hash_model: "CSQ"
+hash_model: "DPSH"
 attack_method: "dhta"
 n_t: 9
-epsilon: 8 / 255
+epsilon: 0.03
 iteration: 100
 transfer: False
 trans_config:

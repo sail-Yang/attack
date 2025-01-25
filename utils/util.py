@@ -31,9 +31,24 @@ def generateCode(model, data_loader, num_data, bit, use_gpu=True):
 
 def get_labels_str(label_txt_path):
   '''
-    get labels from txt file
+    get labels (str) from txt file
   '''
   labels_int = np.loadtxt(label_txt_path, dtype=np.int64)
   labels_str = [''.join(label) for label in labels_int.astype(str)]
   labels_str = np.array(labels_str, dtype=str)
   return labels_str
+
+def get_labels_int(label_txt_path):
+  '''
+    get labels (int) from txt file
+  '''
+  labels_int = np.loadtxt(label_txt_path, dtype=np.int64)
+  return labels_int
+
+def generateHash(model, samples):
+  '''
+    genrate hash code for a batch
+  '''
+  output = model(samples)
+  B = torch.sign(output.cpu().data).numpy()
+  return B
