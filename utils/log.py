@@ -38,12 +38,13 @@ def create_attack_hashing_logger(args):
   backbone = args.backbone
   dataset = args.dataset
   num_bits = args.num_bits
+  hash_model = args.hash_model
   log_time = time.strftime('%Y-%m-%d-%H-%M')
-  log_dir_path = os.path.join(logger_file_path, attack_method)
+  log_dir_path = os.path.join(logger_file_path, attack_method, hash_model)
   if not os.path.exists(log_dir_path):
     os.makedirs(log_dir_path)
   log_name = f"{backbone}_{dataset}_{num_bits}_{log_time}.log"
-  log_path = os.path.join(logger_file_path, attack_method, log_name)
+  log_path = os.path.join(logger_file_path, attack_method, hash_model, log_name)
   
   logger = logging.getLogger() 
   logger.setLevel(logging.INFO) 
