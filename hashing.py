@@ -13,7 +13,8 @@ if __name__ == "__main__":
   args = load_config(conf_root)
   seed_setting(args.seed)
   logger = create_hashing_logger(args)
-  train_loader, test_loader, database_loader, _, _, _ = get_data(args)
+  train_loader, test_loader, database_loader, num_train, num_test, num_database = get_data(args)
+  args.dpsh_params.num_train = num_train
   model = HashModel(args)
   if args.train:
     logger.info(f"{args.hash_model}, {args.backbone}, {args.dataset}, {args.num_bits} bits, training...")

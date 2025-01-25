@@ -20,7 +20,7 @@ class HashNetLoss(torch.nn.Module):
     self.scale = scale
     self.alpha = alpha
   
-  def forward(self, u, y):  # , scale):
+  def forward(self, u, y, ind):  # , scale):
     u = torch.tanh(u)
     s = (y @ y.t() > 0).float()
     sigmoid_alpha = self.alpha
@@ -80,13 +80,35 @@ class CSQLoss(nn.Module):
     )
     return target_centers
 
-  def forward(self, u, y):
+  def forward(self, u, y, ind):
     u = torch.tanh(u)
     c = self.label2center(y)
     c_loss = F.binary_cross_entropy((u + 1) / 2, (c + 1) / 2)
     q_loss = (u.abs() - 1.0).pow(2).mean()
     loss = c_loss + self.lambda_ * q_loss
     return loss
+
+class DPSHLoss(nn.Module):
+  '''
+    Deep Hash method: DPSH
+  '''
+  def __init__(self, num_classes, num_train, num_bits, alpha):
+    super().__init__()
+    self.U = torch.zeros(num_train, num_bits).float().cuda()
+    self.Y = torch.zeros(num_train, num_classes).float().cuda()
+    self.alpha = alpha
+  
+  def forward(self, u, y, ind):
+    self.U[ind, :] = u.data
+    self.Y[ind, :] = y.float()
+    
+    s = (y @ self.Y.t() > 0).float()
+    inner_product = u @ self.U.t() * 0.5
+    
+    likelihood_loss = (1 + (-(inner_product.abs())).exp()).log() + inner_product.clamp(min=0) - s * inner_product
+    likelihood_loss = likelihood_loss.mean()
+    quantization_loss = self.alpha * (u - u.sign()).pow(2).mean()
+    return likelihood_loss + quantization_loss
 
 class HashModel:
   def __init__(self, args):
@@ -104,8 +126,6 @@ class HashModel:
       self.model = AlexNet(self.args.num_bits)
     else:
       raise NotImplementedError
-    if torch.cuda.is_available():
-      self.model = self.model.cuda()
   
   def train(self, train_loader, val_loader, database_loader):
     num_epochs = self.args.epoch
@@ -116,6 +136,8 @@ class HashModel:
     elif self.model_name == "CSQ":
       lambda_ = self.args.csq_params.lambda_
       critertion = CSQLoss(self.args.n_class, self.args.num_bits, lambda_)
+    elif self.model_name == "DPSH":
+      critertion = DPSHLoss(self.args.n_class, self.args.dpsh_params.num_train, self.args.num_bits, self.args.dpsh_params.alpha)
     else:
       raise NotImplementedError
     
@@ -131,14 +153,14 @@ class HashModel:
     best_mAP = 0
     for epoch in range(num_epochs):
       train_loss = 0
-      for image, label, _ in tqdm(train_loader,ascii=True):
+      for image, label, ind in tqdm(train_loader,ascii=True):
         image = image.cuda()
         label = label.cuda()
         
         output = model(image)
         optimizer.zero_grad()
         
-        loss = critertion(output, label.float())
+        loss = critertion(output, label.float(), ind)
         train_loss += loss.item()
         loss.backward()
         optimizer.step()
@@ -168,7 +190,6 @@ class HashModel:
     path = os.path.join(save_path, self.args.hash_model, file_name)
     checkpoint = torch.load(path)
     self.model.load_state_dict(checkpoint)
-    return self.model
 
   @staticmethod
   def load_t_model(model_path):
@@ -185,5 +206,3 @@ class HashModel:
     model = self.model.eval().cuda()
     map_, data = validate_hash(test_loader, database_loader, model, top_k=5000)
     logging.info(f"Test mAP: {map_:.4f}")    
-    
-    
