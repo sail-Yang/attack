@@ -135,17 +135,18 @@ def target_hash_adv(model, query, target_hash, epsilon, alpha=1, iteration=2000,
   if randomize:
     delta.uniform_(-epsilon, epsilon)
     delta.data = (query.data + delta.data).clamp(0, 1) - query.data
+    
   for i in range(iteration):
     # noisy_output = model(query + delta, factor)
     noisy_output = model(query + delta)
     loss = target_adv_loss(noisy_output, target_hash)
     loss.backward()
     
+    # delta.data = delta - alpha / 255 * torch.sign(delta.grad.detach())
     delta.data = delta - alpha * delta.grad.detach()
     delta.data = delta.data.clamp(-epsilon, epsilon)
     delta.data = (query.data + delta.data).clamp(0, 1) - query.data
     delta.grad.zero_()
-  
   return query + delta.detach()
     
     
@@ -159,10 +160,10 @@ if __name__ == "__main__":
   model, t_model, database_code_path, t_database_code_path, target_label_path, test_code_path, t_bit = config_dhta(args)
   database_hash, t_database_hash, target_labels = get_labels_and_codes(args, model, t_model, database_code_path, t_database_code_path, target_label_path, database_loader, num_test, num_database)
   target_labels_str = [''.join(label) for label in target_labels.astype(str)]
-  
   # 获取database labels
   database_txt_path = os.path.join(args.txt_path, "database_label.txt")
   database_labels_str = get_labels_str(database_txt_path)
+  
   qB = np.zeros([num_test, t_bit], dtype=np.float32)
   query_anchor_codes = np.zeros((num_test, args.num_bits), dtype=np.float32)
   perceptibility = 0

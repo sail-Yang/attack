@@ -190,6 +190,7 @@ class HashModel:
     path = os.path.join(save_path, self.args.hash_model, file_name)
     checkpoint = torch.load(path)
     self.model.load_state_dict(checkpoint)
+    self.model.eval()
 
   @staticmethod
   def load_t_model(model_path):

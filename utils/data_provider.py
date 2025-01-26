@@ -56,7 +56,6 @@ class HashingDataset(Dataset):
   def __len__(self):
     return len(self.img_filename_list)
 
-
 def image_transform(resize_size, crop_size, is_train=True):
   '''
   transform设置
@@ -67,10 +66,7 @@ def image_transform(resize_size, crop_size, is_train=True):
     step = [transforms.CenterCrop(crop_size)]
   return transforms.Compose([transforms.Resize(resize_size)]
     + step +
-    [transforms.ToTensor(),
-      transforms.Normalize(mean=[0.485, 0.456, 0.406],
-        std=[0.229, 0.224, 0.225])
-    ]
+    [transforms.ToTensor()]
   )
 
 def get_data(args):
