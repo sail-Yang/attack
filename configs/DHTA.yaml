@@ -1,6 +1,6 @@
 ### Model params
 # AlexNet/ResNet/VGG
-backbone: "ResNet50"
+backbone: "ResNet34"
 lr: 1e-4
 epoch: 100
 alpha: 0.05
@@ -8,7 +8,7 @@ weight_decay: 10 ** -5
 momentum: 0.9
 num_bits: 64
 batch_size: 32
-checkpoing: 10
+checkpoint: 10
 
 ### Dataset params
 # coco/nuswide/flick/imagenet/cifar10/flickr

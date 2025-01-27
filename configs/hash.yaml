@@ -1,17 +1,17 @@
 ### Model params
 # AlexNet/ResNet/VGG
-backbone: "VGG11"
+backbone: "ResNet50"
 lr: 1e-4
-epoch: 20
+epoch: 60
 weight_decay: 10 ** -5
 momentum: 0.9
-num_bits: 32
+num_bits: 64
 batch_size: 256
-checkpoint: 25
+checkpoint: 20
 
 ### Dataset params
 # coco/nuswide/flick/imagenet/cifar10/flickr
-dataset: "coco"
+dataset: "nuswide"
 resize_size: 256
 crop_size: 224
 num_workers: 4
