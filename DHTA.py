@@ -152,7 +152,7 @@ def target_hash_adv(model, query, target_hash, epsilon, alpha=1, iteration=2000,
     
 
 if __name__ == "__main__":
-  conf_root = "./configs/DHTA.yaml"
+  conf_root = "./configs/dhta.yaml"
   args = load_config(conf_root)
   seed_setting(args.seed)
   logger = create_attack_hashing_logger(args)
