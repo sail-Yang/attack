@@ -4,6 +4,7 @@ import random
 import numpy as np
 from tqdm import tqdm
 from torch.optim import lr_scheduler
+from torch.autograd import Variable
 
 def seed_setting(seed=2021):
   """
@@ -87,6 +88,11 @@ def CalcSim(X, Y):
   return S
 
 def log_trick(x):
-  lt = torch.log(1 + torch.exp(-torch.abs(x))) + torch.max(
-    x, torch.tensor([0.], requires_grad=True).cuda())
-  return lt
+    lt = torch.log(1 + torch.exp(-torch.abs(x))) + torch.max(
+        x, Variable(torch.FloatTensor([0.]).cuda()))
+    return lt
+
+def set_input_images(_input):
+    _input = _input.cuda()
+    _input = 2 * _input - 1
+    return _input
