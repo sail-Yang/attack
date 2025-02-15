@@ -29,14 +29,13 @@ class TargetAttackGAN(nn.Module):
     self.build_model()
   
   def build_model(self):
-    self.generator = nn.DataParallel(Generator()).cuda()
-    self.discriminator = nn.DataParallel(Discriminator(self.n_class)).cuda()
-    self.prototype_net = nn.DataParallel(PrototypeNet(self.bit, self.n_class)).cuda()
+    self.generator = Generator().cuda()
+    self.discriminator = Discriminator(self.n_class).cuda()
+    self.prototype_net = PrototypeNet(self.bit, self.n_class).cuda()
     # load hash model
     self.hashModel = HashModel(self.args)
     self.hashModel.load_model()
     self.hashModel = self.hashModel.model.cuda()
-    self.hashModel.eval()
     
     self.criterionGAN = GANLoss(self.args.gan_mode).cuda()
   
@@ -68,7 +67,7 @@ class TargetAttackGAN(nn.Module):
     if os.path.exists(prototype_path):
       self.load_module(self.prototype_net, prototype_path)
     else:
-      self.train_prototype_net(database_loader, target_labels, num_train)
+      self.train_prototype_net(database_loader, target_labels, train_labels, num_train)
     self.prototype_net.eval()
     self.test_prototype(target_labels, database_loader, database_labels, num_database, num_test)
   
@@ -116,7 +115,13 @@ class TargetAttackGAN(nn.Module):
         g_loss.backward()
         optimizer_gen.step()
         
-        if i % self.args.checkpoint:
+        if i % self.args.sample_checkpoint == 0:
+          dir_path = os.path.join(self.args.save_path, self.args.attack_method, "sample")
+          sample_img(fake_g, dir_path, str(epoch) + '_' + str(i) + '_fake')
+          sample_img(real_input, dir_path, str(epoch) + '_' + str(i) + '_real')
+        
+        if i % self.args.checkpoint == 0:
+          
           logger.info(
             'step: {:3d} g_loss: {:.3f} d_loss: {:.3f} hash_loss: {:.3f} r_loss: {:.7f}'
                         .format(i, fake_g_loss, d_loss, logloss, reconstruction_loss)
@@ -127,7 +132,7 @@ class TargetAttackGAN(nn.Module):
   def test(self, target_labels, database_loader, test_loader, database_labels, test_labels, num_database, num_test):
     self.prototype_net.eval()
     self.generator.eval()
-    targeted_labels = np.zeros([num_test, self.num_classes])
+    targeted_labels = np.zeros([num_test, self.n_class])
     qB = np.zeros([num_test, self.bit])
     
     perceptibility = 0
@@ -144,7 +149,7 @@ class TargetAttackGAN(nn.Module):
       target_fake = (target_fake + 1) / 2
       data_input = (data_input + 1) / 2 
       
-      target_hashing = self.hashing_model(target_fake)
+      target_hashing = self.hashModel(target_fake)
       qB[data_ind.numpy(), :] = torch.sign(target_hashing.cpu().data).numpy()
       
       perceptibility += F.mse_loss(data_input, target_fake).data * data_ind.size(0)
@@ -160,6 +165,7 @@ class TargetAttackGAN(nn.Module):
       np.savetxt(database_code_path, database_hash, fmt="%d")
     database_txt_path = os.path.join(self.args.txt_path, "database_label.txt")
     database_labels_int = get_labels_int(database_txt_path)
+    logger.info(f"perceptibility: {torch.sqrt(perceptibility/num_test):.7f}")
     t_map = CalcTopMap(database_hash, qB, database_labels_int, targeted_labels, topk=self.args.topK)
     logger.info('t_MAP(retrieval database): %3.5f' % (t_map))
     map_ = CalcTopMap(database_hash, qB, database_labels_int, test_labels, topk=self.args.topK)
@@ -168,7 +174,7 @@ class TargetAttackGAN(nn.Module):
   
     
             
-  def train_prototype_net(self,database_loader, target_labels, num_train):
+  def train_prototype_net(self,database_loader, target_labels, train_labels, num_train):
     optimizer_l = torch.optim.Adam(self.prototype_net.parameters(), lr=self.args.lr, betas=(0.5, 0.999))
     epochs = 100
     steps = 300
@@ -187,10 +193,11 @@ class TargetAttackGAN(nn.Module):
         select_index = np.random.choice(range(target_labels.size(0)), size=batch_size)
         batch_target_label = target_labels.index_select(0, torch.from_numpy(select_index)).cuda()
         optimizer_l.zero_grad()
+        
         _, target_hash_l, label_pred = self.prototype_net(batch_target_label)
         theta_x = target_hash_l.mm(B.t()) / 2        
-        S = CalcSim(batch_target_label.cpu(), self.train_labels)
-        logloss = S.cuda() * theta_x - log_trick(theta_x)
+        S = CalcSim(batch_target_label.cpu(), train_labels)
+        logloss = (S.cuda() * theta_x - log_trick(theta_x)).sum() / (num_train * batch_size)
         logloss = -logloss
         regterm = (torch.sign(target_hash_l) - target_hash_l).pow(2).sum() / (1e4 * batch_size)
         classifer_loss = criterion_l2(label_pred, batch_target_label)
@@ -204,15 +211,15 @@ class TargetAttackGAN(nn.Module):
     self.save_prototypenet()
 
   def load_module(self, model, model_path):
-    model.module.load_state_dict(torch.load(model_path))
+    model.load_state_dict(torch.load(model_path))
     
   def save_prototypenet(self):
     prototype_path = os.path.join(self.args.save_path, self.args.attack_method, 'prototypenet_{}.pt'.format(self.model_name))
-    torch.save(self.prototype_net.module.state_dict(), prototype_path)
+    torch.save(self.prototype_net.state_dict(), prototype_path)
   
   def save_generator(self):
     gen_path = os.path.join(self.args.save_path, self.args.attack_method, 'generator_{}.pt'.format(self.model_name))
-    torch.save(self.generator.module.state_dict(), gen_path)
+    torch.save(self.generator.state_dict(), gen_path)
   
   def load_all_model(self):
     prototype_path = os.path.join(self.args.save_path, self.args.attack_method, 'prototypenet_{}.pt'.format(self.model_name))
@@ -221,7 +228,7 @@ class TargetAttackGAN(nn.Module):
     self.load_module(self.generator, gen_path)
     
   def test_prototype(self, target_labels, database_loader, database_labels, num_database, num_test):
-    targeted_labels = np.zeros([num_test, self.num_classes])
+    targeted_labels = np.zeros([num_test, self.n_class])
     qB = np.zeros([num_test, self.bit])
     
     for i in range(num_test):
@@ -276,12 +283,11 @@ if __name__ == "__main__":
   
   model = TargetAttackGAN(args=args)
   if args.train:
-    if args.load:
-      model.load_all_model()
-    else:
-      model.train(train_loader, target_labels, train_labels, database_loader, database_labels, num_database, num_train, num_test)
+    logger.info("training...")
+    model.train(train_loader, target_labels, train_labels, database_loader, database_labels, num_database, num_train, num_test)
   
   if args.test:
+    logger.info("testing...")
     model.load_all_model()
     model.test(target_labels, database_loader, test_loader, database_labels, test_labels, num_database, num_test)
   

@@ -58,6 +58,7 @@ class Generator(nn.Module):
         nn.InstanceNorm2d(curr_dim * 2),
         nn.ReLU(inplace=True)
       ]
+      curr_dim = curr_dim * 2
     # Bottleneck
     for i in range(3):
       image_encoder += [
