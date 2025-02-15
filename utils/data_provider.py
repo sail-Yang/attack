@@ -60,13 +60,11 @@ def image_transform(resize_size, crop_size, is_train=True):
   '''
   transform设置
   '''
-  if is_train:
-    step = [transforms.RandomHorizontalFlip(), transforms.RandomCrop(crop_size)]
-  else:
-    step = [transforms.CenterCrop(crop_size)]
-  return transforms.Compose([transforms.Resize(resize_size)]
-    + step +
-    [transforms.ToTensor()]
+  return transforms.Compose([
+      transforms.Resize(resize_size),
+      transforms.CenterCrop(crop_size),
+      transforms.ToTensor()
+    ]
   )
 
 def get_data(args):
