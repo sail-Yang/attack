@@ -10,7 +10,6 @@ from utils.validate import CalcTopMap
 from models.GAN import *
 from models.prototypeNet import PrototypeNet
 from models.hash_model import HashModel
-from utils.validate import CalcTopMap
 
 torch.multiprocessing.set_sharing_strategy("file_system")
 
