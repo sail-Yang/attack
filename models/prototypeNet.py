@@ -1,4 +1,5 @@
 import torch.nn as nn
+import torch
 
 class PrototypeNet(nn.Module):
   def __init__(self, bit, num_classes):
@@ -17,3 +18,9 @@ class PrototypeNet(nn.Module):
     h = self.hashing(f)
     c = self.classifier(f)
     return f, h, c
+
+  def load_model(self, pnet_path):
+    checkpoint = torch.load(pnet_path)
+    self.load_state_dict(checkpoint)
+    self.eval()
+  
