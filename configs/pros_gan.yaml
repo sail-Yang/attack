@@ -1,6 +1,6 @@
 ### Model params
 # AlexNet/ResNet/VGG
-backbone: "ResNet34"
+backbone: "VGG11"
 lr: 1e-4
 epoch: 100
 alpha: 0.05
@@ -8,7 +8,8 @@ weight_decay: 10 ** -5
 momentum: 0.9
 num_bits: 64
 batch_size: 32
-checkpoint: 10
+checkpoint: 20
+sample_checkpoint: 100
 
 ### Dataset params
 # coco/nuswide/flick/imagenet/cifar10/flickr
@@ -24,13 +25,12 @@ txt_path: "./data/"
 ### attack settings
 hash_model: "DPSH"
 attack_method: "pros_gan"
-train: True
+train: False
 test: True
-load: False
 # lsgan/vanilla/wgangp
-gan_mode: lsgan
+gan_mode: "lsgan"
 # optimizer linear/step/plateau/cosine
-lr_policy: linear
+lr_policy: "linear"
 epsilon: 0.03
 n_epochs: 50
 # the starting epoch count, we save the model by <epoch_count>, <epoch_count>+<save_latest_freq>
