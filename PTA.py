@@ -148,16 +148,17 @@ def evaluate(args, model, database_hash):
   database_txt_path = os.path.join(args.txt_path, "database_label.txt")
   database_label_ = get_labels_int(database_txt_path)
   database_label = torch.from_numpy(database_label_).float()
+  if args.in_class:
+    target = 1
+    target_label_path = os.path.join(args.save_path, args.attack_method, "target_label_single_in_class_{}_{}_{}_{}.txt".format(args.dataset, args.hash_model, args.backbone, args.num_bits))
+  else:
+    target = 0
+    target_label_path = os.path.join(args.save_path, args.attack_method, "target_label_single_out_class_{}_{}_{}_{}.txt".format(args.dataset, args.hash_model, args.backbone, args.num_bits))
   
-  target_label_path = os.path.join(args.save_path, args.attack_method, "target_label_single_{}_{}_{}_{}.txt".format(args.dataset, args.hash_model, args.backbone, args.num_bits))
   if os.path.exists(target_label_path):
     target_labels = get_labels_int(target_label_path)
   qB, qB_clean, clean_labelL, queryL = [], [], [], []  
   
-  if args.in_class:
-    target = 1
-  else:
-    target = 0
   
   perceptibility = 0
   for it, data in (enumerate(tqdm(test_loader))):
