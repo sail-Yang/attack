@@ -28,7 +28,7 @@ def config_tha(args):
   '''
   if args.n_t == 1:
     args.attack_method = "p2p"
-  hashModel = HashModel(args)
+  hashModel = HashModel(args, args.hash_model, args.backbone, args.num_bits)
   hashModel.load_model()
   model = hashModel.model.cuda()
   database_code_path = os.path.join(args.save_path, args.attack_method, "database_code_{}_{}_{}_{}.txt".format(args.dataset, args.hash_model, args.backbone, args.num_bits))
@@ -36,8 +36,11 @@ def config_tha(args):
     t_hash_model = args.trans_config.t_hash_model
     t_bit = args.trans_config.t_bit
     t_backbone = args.trans_config.t_backbone
-    t_model_path = os.path.join(args.hash_save_path, t_hash_model, '{}_{}_{}_{}.pt'.format(t_hash_model, t_backbone, t_bit))
-    t_model = HashModel.load_t_model(t_model_path)
+    logger.info("target model: {} {} {}".format(t_hash_model, t_backbone, t_bit))
+    
+    t_model = HashModel(args, t_hash_model, t_backbone, t_bit)
+    t_model.load_model()
+    t_model = t_model.model.cuda()
   else:
     t_hash_model = args.hash_model
     t_bit = args.num_bits
@@ -259,6 +262,6 @@ logger.info("perceptibility: {:.7f}".format(torch.sqrt(perceptibility/num_test))
 p_map = CalcMap(t_database_hash, query_prototype_codes, database_labels_int, targeted_labels)
 logger.info("prototype codes t-MAP[retrieval database]: {:.7f}".format(p_map))
 t_map = CalcMap(t_database_hash, qB, database_labels_int, targeted_labels)
-logger.info("t-MAP[retrieval database]: {:.7f}".format(t_map))
+logger.info("t-MAP of adv[retrieval database]: {:.7f}".format(t_map))
 map = CalcTopMap(t_database_hash, qB, database_labels_int, test_labels_int, topk=args.topK)
-logger.info("MAP[retrieval database]: {:.7f}".format(map))
+logger.info("MAP of adv[retrieval database]: {:.7f}".format(map))

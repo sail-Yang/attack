@@ -1,6 +1,6 @@
 ### Model params
 # AlexNet/ResNet/VGG
-backbone: "VGG11"
+backbone: "ResNet50"
 lr: 1e-4
 epoch: 100
 alpha: 0.05
@@ -27,10 +27,10 @@ attack_method: "tha"
 n_t: 9
 epsilon: 0.03
 iteration: 1
-transfer: False
+transfer: True
 trans_config:
   t_hash_model: "DPSH"
-  t_bit: 32
+  t_bit: 64
   t_backbone: "VGG11"
 
 ### other configs
