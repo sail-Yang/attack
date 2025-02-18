@@ -17,7 +17,7 @@ crop_size: 224
 num_workers: 4
 topK: 5000
 n_class: 10
-data_path: "/data2/fyang/data"
+data_path: "/opt/data/private/workspace/fyang/data"
 txt_path: "./data/"
 
 ### Deep Hash settings
@@ -39,5 +39,3 @@ log_path: "./log/hashing"
 hash_save_path: "./save/hashing"
 gpu: 0
 seed: 2021
-
-ai_max

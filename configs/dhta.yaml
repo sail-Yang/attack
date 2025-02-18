@@ -1,6 +1,6 @@
 ### Model params
 # AlexNet/ResNet/VGG
-backbone: "ResNet34"
+backbone: "ResNet50"
 lr: 1e-4
 epoch: 100
 alpha: 0.05
@@ -18,7 +18,7 @@ crop_size: 224
 num_workers: 4
 topK: 5000
 n_class: 10
-data_path: "/data2/fyang/data"
+data_path: "/opt/data/private/workspace/fyang/data"
 txt_path: "./data/"
 
 ### attack settings
