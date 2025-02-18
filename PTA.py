@@ -54,6 +54,7 @@ def evaluate_multi(args, model, t_model, database_hash):
   
   tmap_mean = 0
   tmap_mean_clean = 0
+  l0_norm_mean = 0
   perceptibility = 0
   for it, data in (enumerate(test_loader)):
     query = data[0].cuda()
@@ -107,6 +108,12 @@ def evaluate_multi(args, model, t_model, database_hash):
     a, _ = target_adv(query=query, model=model, pos_hash=pos_train_hash, neg_hash=neg_train_hash,
                       pos_num=pos_train_hash.shape[0], epsilon=args.epsilon, iteration=args.iteration)
     
+    # calculate l-0 norm
+    diff = torch.ne(query, a)
+    l0_norm = torch.sum(diff).item()
+    total_pixels = query.numel()
+    l0_norm_mean += l0_norm / total_pixels * 1
+    
     if args.transfer:
       # transfer test
       if it % 50 == 0:
@@ -136,6 +143,9 @@ def evaluate_multi(args, model, t_model, database_hash):
   if not os.path.exists(target_label_path):
     np.savetxt(target_label_path, L.cpu().detach().numpy(), fmt='%d')
   
+  logger.info("perceptibility: {:.7f}".format(torch.sqrt(perceptibility/len(dset_test))))
+  logger.info("L0 norm: {:.7f}".format(l0_norm_mean / len(dset_test)))
+  
   qB_ = qB.cpu().detach().numpy()
   qB_clean_ = qB_clean.cpu().detach().numpy()
   tmap_clean_ori = CalcMap(database_hash, qB_, database_label_, clean_labelL)
@@ -144,7 +154,6 @@ def evaluate_multi(args, model, t_model, database_hash):
   tmap_mean = tmap_mean / (len(dset_test) / 50)
   tmap_mean_clean = tmap_mean_clean / (len(dset_test) / 50)
   
-  logger.info("perceptibility: {:.7f}".format(torch.sqrt(perceptibility/len(dset_test))))
   logger.info("t-MAP of adv[retrieval database]: {:.7f}".format(tmap_mean))
   logger.info("t-MAP of origin[retrieval database]: {:.7f}".format(tmap_mean_clean))
   logger.info("MAP of adv[retrieval database]: {:.7f}".format(tmap_clean_ori))
@@ -172,6 +181,7 @@ def evaluate(args, model, t_model, database_hash):
   
   
   perceptibility = 0
+  l0_norm_mean = 0
   for it, data in (enumerate(tqdm(test_loader))):
     query = data[0].cuda()
     label = data[1]
@@ -218,6 +228,12 @@ def evaluate(args, model, t_model, database_hash):
       qB_clean.append(torch.sign(model(query)).cpu().detach())
     queryL.append((torch.Tensor(target_label).reshape(1, len(target_label))).cpu().detach())
     
+    # calculate l-0 norm
+    diff = torch.ne(query, a)
+    l0_norm = torch.sum(diff).item()
+    total_pixels = query.numel()
+    l0_norm_mean += l0_norm / total_pixels * 1
+    
     perceptibility += F.mse_loss(query, a).data * 1
   
   qB = torch.cat(qB, 0).numpy()
@@ -228,12 +244,14 @@ def evaluate(args, model, t_model, database_hash):
   if not os.path.exists(target_label_path):
     np.savetxt(target_label_path, queryL, fmt='%d')
   
+  logger.info("perceptibility: {:.7f}".format(torch.sqrt(perceptibility/len(dset_test))))
+  logger.info("L0 norm: {:.7f}".format(l0_norm_mean / len(dset_test)))
+  
   tmap_adv = CalcTopMap(database_hash, qB, database_label_, queryL, args.topK)
   tmap_ori = CalcTopMap(database_hash, qB_clean, database_label_, queryL, args.topK)
   map_adv = CalcTopMap(database_hash, qB, database_label_, clean_labelL, args.topK)
   map_ori = CalcTopMap(database_hash, qB_clean, database_label_, clean_labelL, args.topK)
   
-  logger.info("perceptibility: {:.7f}".format(torch.sqrt(perceptibility/len(dset_test))))
   logger.info("t-MAP of adv[retrieval database]: {:.7f}".format(tmap_adv))
   logger.info("t-MAP of origin[retrieval database]: {:.7f}".format(tmap_ori))
   logger.info("MAP of adv[retrieval database]: {:.7f}".format(map_adv))
@@ -270,6 +288,7 @@ if __name__ == "__main__":
   else:
     bit = args.num_bits
     database_code_path = os.path.join(args.save_path, args.attack_method, "database_code_{}_{}_{}_{}.txt".format(args.dataset, args.hash_model, args.backbone, args.num_bits))
+    t_model = model
     
   if os.path.exists(database_code_path):
     database_hash = np.loadtxt(database_code_path, dtype=np.float32)

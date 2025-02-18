@@ -35,7 +35,7 @@ replace: False
 multi: False
 # in/out-of-classes case
 in_class: True
-transfer: True
+transfer: False
 trans_config:
   t_hash_model: "DPSH"
   t_bit: 64

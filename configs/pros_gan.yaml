@@ -26,7 +26,7 @@ txt_path: "./data/"
 hash_model: "DPSH"
 attack_method: "pros_gan"
 train: False
-test: False
+test: True
 # lsgan/vanilla/wgangp
 gan_mode: "lsgan"
 # optimizer linear/step/plateau/cosine
@@ -40,7 +40,7 @@ n_epochs_decay: 50
 
 
 
-transfer: True
+transfer: False
 trans_config:
   t_hash_model: "DPSH"
   t_bit: 64

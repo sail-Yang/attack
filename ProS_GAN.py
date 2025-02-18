@@ -136,6 +136,7 @@ class TargetAttackGAN(nn.Module):
     qB = np.zeros([num_test, self.bit])
     
     perceptibility = 0
+    l0_norm_mean = 0
     start = time.time()
     for it, data in enumerate(test_loader):
       data_input, _, data_ind = data
@@ -152,6 +153,11 @@ class TargetAttackGAN(nn.Module):
       target_hashing = self.hashModel(target_fake)
       qB[data_ind.numpy(), :] = torch.sign(target_hashing.cpu().data).numpy()
       
+      # calculate l-0 norm
+      diff = torch.ne(data_input, target_fake)
+      l0_norm = torch.sum(diff).item()
+      total_pixels = data_input.numel()
+      l0_norm_mean += l0_norm / total_pixels * data_ind.size(0)
       perceptibility += F.mse_loss(data_input, target_fake).data * data_ind.size(0)
     end = time.time()
     logger.info('Running time: %s Seconds'%(end-start))
@@ -167,6 +173,7 @@ class TargetAttackGAN(nn.Module):
     database_txt_path = os.path.join(self.args.txt_path, "database_label.txt")
     database_labels_int = get_labels_int(database_txt_path)
     logger.info(f"perceptibility: {torch.sqrt(perceptibility/num_test):.7f}")
+    logger.info("L0 norm: {:.7f}".format(l0_norm_mean / num_test))
     t_map = CalcTopMap(database_hash, qB, database_labels_int, targeted_labels, topk=self.args.topK)
     logger.info('t_MAP(retrieval database): %3.5f' % (t_map))
     map_ = CalcTopMap(database_hash, qB, database_labels_int, test_labels, topk=self.args.topK)
