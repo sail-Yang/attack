@@ -25,6 +25,7 @@ class TargetAttackGAN(nn.Module):
     self.lr = args.lr
     self.args = args
     self.model_name = '{}_{}_{}_{}'.format(args.dataset, args.hash_model, args.backbone, args.num_bits)
+    self.t_model_name = '{}_{}_{}_{}'.format(args.dataset, args.trans_config.t_hash_model, args.trans_config.t_backbone, args.trans_config.t_bit)
     self.build_model()
   
   def build_model(self):
@@ -32,7 +33,7 @@ class TargetAttackGAN(nn.Module):
     self.discriminator = Discriminator(self.n_class).cuda()
     self.prototype_net = PrototypeNet(self.bit, self.n_class).cuda()
     # load hash model
-    self.hashModel = HashModel(self.args)
+    self.hashModel = HashModel(self.args, args.hash_model, args.backbone, args.num_bits)
     self.hashModel.load_model()
     self.hashModel = self.hashModel.model.cuda()
     
@@ -154,7 +155,8 @@ class TargetAttackGAN(nn.Module):
       perceptibility += F.mse_loss(data_input, target_fake).data * data_ind.size(0)
     end = time.time()
     logger.info('Running time: %s Seconds'%(end-start))
-    
+    np.savetxt(os.path.join(self.args.save_path, self.args.attack_method, "test_code_{}.txt".format(self.model_name)), qB, fmt="%d")
+    np.savetxt(os.path.join(self.args.save_path, self.args.attack_method, "target_label_{}.txt".format(self.model_name)), targeted_labels, fmt="%d")
     # load database code
     database_code_path = os.path.join(self.args.save_path, self.args.attack_method, "database_code_{}.txt".format(self.model_name))
     if os.path.exists(database_code_path):
@@ -170,7 +172,55 @@ class TargetAttackGAN(nn.Module):
     map_ = CalcTopMap(database_hash, qB, database_labels_int, test_labels, topk=self.args.topK)
     logger.info('MAP(retrieval database): %3.5f' % (map_))
   
-  
+  def transfer_test(self, target_labels, database_loader, test_loader, database_labels, test_labels, num_database, num_test):
+    # load target hash model
+    self.t_hashModel = HashModel(self.args, args.trans_config.t_hash_model, args.trans_config.t_backbone, args.trans_config.t_bit)
+    self.t_hashModel.load_model()
+    self.t_hashModel = self.t_hashModel.model.cuda()
+    self.bit = self.args.trans_config.t_bit
+    
+    self.generator.eval()
+    self.prototype_net.eval()
+    
+    qB = np.zeros([num_test, self.bit])
+    targeted_labels = np.zeros([num_test, self.n_class])
+    
+    perceptibility = 0
+    start = time.time()
+    for it, data in enumerate(test_loader):
+      data_input, _, data_ind = data
+      select_index = np.random.choice(range(target_labels.size(0)), size=data_ind.size(0))
+      batch_target_label = target_labels.index_select(0, torch.from_numpy(select_index))
+      targeted_labels[data_ind.numpy(), :] = batch_target_label.numpy()
+      
+      data_input = self.set_input_images(data_input)
+      feature,_,_ = self.prototype_net(batch_target_label.cuda())
+      target_fake, _ = self.generator(data_input, feature)
+      target_fake = (target_fake + 1) / 2
+      data_input = (data_input + 1) / 2 
+      
+      target_hashing = self.t_hashModel(target_fake)
+      qB[data_ind.numpy(), :] = torch.sign(target_hashing.cpu().data).numpy()
+      
+      perceptibility += F.mse_loss(data_input, target_fake).data * data_ind.size(0)
+    end = time.time()
+    logger.info('Running time: %s Seconds'%(end-start))
+    np.savetxt(os.path.join(self.args.save_path, self.args.attack_method, "test_code_{}.txt".format(self.t_model_name)), qB, fmt="%d")
+    np.savetxt(os.path.join(self.args.save_path, self.args.attack_method, "target_label_{}.txt".format(self.t_model_name)), targeted_labels, fmt="%d")
+    # load database code
+    database_code_path = os.path.join(self.args.save_path, self.args.attack_method, "database_code_{}.txt".format(self.model_name))
+    if os.path.exists(database_code_path):
+      database_hash = np.loadtxt(database_code_path, dtype=np.float32)
+    else:
+      database_hash = generateCode(self.t_hashModel, database_loader, num_database, args.num_bits)
+      np.savetxt(database_code_path, database_hash, fmt="%d")
+    database_txt_path = os.path.join(self.args.txt_path, "database_label.txt")
+    database_labels_int = get_labels_int(database_txt_path)
+    logger.info(f"perceptibility: {torch.sqrt(perceptibility/num_test):.7f}")
+    t_map = CalcTopMap(database_hash, qB, database_labels_int, targeted_labels, topk=self.args.topK)
+    logger.info('t_MAP(retrieval database): %3.5f' % (t_map))
+    map_ = CalcTopMap(database_hash, qB, database_labels_int, test_labels, topk=self.args.topK)
+    logger.info('MAP(retrieval database): %3.5f' % (map_))
     
             
   def train_prototype_net(self,database_loader, target_labels, train_labels, num_train):
@@ -208,7 +258,7 @@ class TargetAttackGAN(nn.Module):
         scheduler.step()
   
     self.save_prototypenet()
-
+    
   def load_module(self, model, model_path):
     model.load_state_dict(torch.load(model_path))
     
@@ -290,6 +340,8 @@ if __name__ == "__main__":
     model.load_all_model()
     model.test(target_labels, database_loader, test_loader, database_labels, test_labels, num_database, num_test)
   
-  # if args.transfer:
-  #   model.load_all_model()
-  #   model.transfer_test(target_labels, database_loader, test_loader, database_labels, test_labels, num_database, num_test, args.target_model)
+  if args.transfer:
+    logger.info("transfer testing ...")
+    logger.info("target model: {} {} {}".format(args.trans_config.t_hash_model, args.trans_config.t_backbone, args.trans_config.t_bit))
+    model.load_all_model()
+    model.transfer_test(target_labels, database_loader, test_loader, database_labels, test_labels, num_database, num_test)

@@ -37,7 +37,7 @@ def target_adv(query, model, pos_hash, neg_hash, pos_num=50, epsilon=8/255, iter
   delta.grad.zero_()
   return query + delta.detach(),query + noise.detach()
   
-def evaluate_multi(args, model, database_hash):
+def evaluate_multi(args, model, t_model, database_hash):
   dset_test = HashingDataset_part(args.data_path, args.txt_path, "test_img.txt","test_label.txt",image_transform(args.resize_size, args.crop_size, False))
   sampler = SequentialSampler(dset_test)
   test_loader = DataLoader(dset_test, batch_size=1, num_workers=4, shuffle=False, sampler=sampler)
@@ -106,12 +106,23 @@ def evaluate_multi(args, model, database_hash):
   
     a, _ = target_adv(query=query, model=model, pos_hash=pos_train_hash, neg_hash=neg_train_hash,
                       pos_num=pos_train_hash.shape[0], epsilon=args.epsilon, iteration=args.iteration)
-    if it % 50 == 0:
-      qB = torch.sign(model(a))
-      qB_clean = torch.sign(model(data[0].cuda()))
+    
+    if args.transfer:
+      # transfer test
+      if it % 50 == 0:
+        qB = torch.sign(t_model(a))
+        qB_clean = torch.sign(t_model(data[0].cuda()))
+      else:
+        qB = torch.cat((qB, torch.sign(t_model(a))))
+        qB_clean = torch.cat((qB_clean, torch.sign(t_model(data[0].cuda()))))
     else:
-      qB = torch.cat((qB, torch.sign(model(a))))
-      qB_clean = torch.cat((qB_clean, torch.sign(model(data[0].cuda()))))
+      # test
+      if it % 50 == 0:
+        qB = torch.sign(model(a))
+        qB_clean = torch.sign(model(data[0].cuda()))
+      else:
+        qB = torch.cat((qB, torch.sign(model(a))))
+        qB_clean = torch.cat((qB_clean, torch.sign(model(data[0].cuda()))))
     
     if it % 50 == 49:
       queryL = queryL.cpu().detach().numpy()
@@ -139,7 +150,7 @@ def evaluate_multi(args, model, database_hash):
   logger.info("MAP of adv[retrieval database]: {:.7f}".format(tmap_clean_ori))
   logger.info("MAP of origin[retrieval database]: {:.7f}".format(tmap_clean_ori_multi))
   
-def evaluate(args, model, database_hash):
+def evaluate(args, model, t_model, database_hash):
   dset_test = HashingDataset_part(args.data_path, args.txt_path, "test_img.txt","test_label.txt",image_transform(args.resize_size, args.crop_size, False))
   sampler = SequentialSampler(dset_test)
   test_loader = DataLoader(dset_test, batch_size=1, num_workers=4, shuffle=False, sampler=sampler)
@@ -191,10 +202,20 @@ def evaluate(args, model, database_hash):
     
     a, _ = target_adv(query=query, model=model, pos_hash=pos_train_hash, neg_hash=neg_train_hash,
                       pos_num=pos_train_hash.shape[0], epsilon=args.epsilon, iteration=args.iteration)
-   
+
+    if it % args.sample_checkpoint == 0:
+      dir_path = os.path.join(args.save_path, args.attack_method, "sample")
+      sample_img(query, dir_path, "{}_ori".format(it))
+      sample_img(a, dir_path, "{}_adv".format(it))
+    
     clean_labelL.append(label.cpu().detach())
-    qB.append(torch.sign(model(a)).cpu().detach())
-    qB_clean.append(torch.sign(model(query)).cpu().detach())
+    if args.transfer:
+      # transfer test
+      qB.append(torch.sign(t_model(a)).cpu().detach())
+      qB_clean.append(torch.sign(t_model(query)).cpu().detach())
+    else:
+      qB.append(torch.sign(model(a)).cpu().detach())
+      qB_clean.append(torch.sign(model(query)).cpu().detach())
     queryL.append((torch.Tensor(target_label).reshape(1, len(target_label))).cpu().detach())
     
     perceptibility += F.mse_loss(query, a).data * 1
@@ -233,25 +254,36 @@ if __name__ == "__main__":
   train_loader, test_loader, database_loader, num_train, num_test, num_database = get_data(args)
   
   # load hash model
-  hashModel = HashModel(args)
+  hashModel = HashModel(args, args.hash_model, args.backbone, args.num_bits)
   hashModel.load_model()
   model = hashModel.model.cuda()
   
   # load database code
-  database_code_path = os.path.join(args.save_path, args.attack_method, "database_code_{}_{}_{}_{}.txt".format(args.dataset, args.hash_model, args.backbone, args.num_bits))
+  if args.transfer:
+    logger.info("target model: {} {} {}".format(args.trans_config.t_hash_model, args.trans_config.t_backbone, args.trans_config.t_bit))
+    # load transfer hash model
+    t_hashModel = HashModel(args, args.trans_config.t_hash_model, args.trans_config.t_backbone, args.trans_config.t_bit)
+    t_hashModel.load_model()
+    t_model = t_hashModel.model.cuda()
+    bit = args.trans_config.t_bit
+    database_code_path = os.path.join(args.save_path, args.attack_method, "database_code_{}_{}_{}_{}.txt".format(args.dataset, args.trans_config.t_hash_model, args.trans_config.t_backbone, args.trans_config.t_bit))
+  else:
+    bit = args.num_bits
+    database_code_path = os.path.join(args.save_path, args.attack_method, "database_code_{}_{}_{}_{}.txt".format(args.dataset, args.hash_model, args.backbone, args.num_bits))
+    
   if os.path.exists(database_code_path):
     database_hash = np.loadtxt(database_code_path, dtype=np.float32)
   else:
-    database_hash = generateCode(model, database_loader, num_database, args.num_bits)
+    database_hash = generateCode(model, database_loader, num_database, bit)
     np.savetxt(database_code_path, database_hash, fmt="%d")
   
   if args.multi:
     logger.info("general target label...")
-    evaluate_multi(args, model, database_hash)
+    evaluate_multi(args, model, t_model, database_hash)
   else:
     if args.in_class:
       logger.info("single in-class target label...")
     else:
       logger.info("single out-class target label...")
-    evaluate(args, model, database_hash)
+    evaluate(args, model, t_model, database_hash)
   

@@ -28,7 +28,7 @@ def config_tha(args):
   '''
   if args.n_t == 1:
     args.attack_method = "p2p"
-  hashModel = HashModel(args)
+  hashModel = HashModel(args, args.hash_model, args.backbone, args.num_bits)
   hashModel.load_model()
   model = hashModel.model.cuda()
   database_code_path = os.path.join(args.save_path, args.attack_method, "database_code_{}_{}_{}_{}.txt".format(args.dataset, args.hash_model, args.backbone, args.num_bits))
@@ -36,8 +36,11 @@ def config_tha(args):
     t_hash_model = args.trans_config.t_hash_model
     t_bit = args.trans_config.t_bit
     t_backbone = args.trans_config.t_backbone
-    t_model_path = os.path.join(args.hash_save_path, t_hash_model, '{}_{}_{}_{}.pt'.format(t_hash_model, t_backbone, t_bit))
-    t_model = HashModel.load_t_model(t_model_path)
+    logger.info("target model: {} {} {}".format(t_hash_model, t_backbone, t_bit))
+    
+    t_model = HashModel(args, t_hash_model, t_backbone, t_bit)
+    t_model.load_model()
+    t_model = t_model.model.cuda()
   else:
     t_hash_model = args.hash_model
     t_bit = args.num_bits
@@ -243,6 +246,13 @@ if __name__ == "__main__":
       query_code = generateHash(t_model, query_adv)
     else:
       query_code = generateHash(model, query_adv)
+    
+    # 采样图像
+    if it % args.sample_checkpoint == 0:
+      dir_path = os.path.join(args.save_path, args.attack_method, "sample")
+      sample_img(image, dir_path, "{}_ori".format(it))
+      sample_img(query_adv, dir_path, "{}_adv".format(it))
+      
     # 生成索引数组
     u_ind = np.linspace(it * args.batch_size, np.min((num_test, (it+1) * args.batch_size)) - 1, batch_size_, dtype=int)
     qB[u_ind, :] = query_code
@@ -259,6 +269,6 @@ logger.info("perceptibility: {:.7f}".format(torch.sqrt(perceptibility/num_test))
 p_map = CalcMap(t_database_hash, query_prototype_codes, database_labels_int, targeted_labels)
 logger.info("prototype codes t-MAP[retrieval database]: {:.7f}".format(p_map))
 t_map = CalcMap(t_database_hash, qB, database_labels_int, targeted_labels)
-logger.info("t-MAP[retrieval database]: {:.7f}".format(t_map))
+logger.info("t-MAP of adv[retrieval database]: {:.7f}".format(t_map))
 map = CalcTopMap(t_database_hash, qB, database_labels_int, test_labels_int, topk=args.topK)
-logger.info("MAP[retrieval database]: {:.7f}".format(map))
+logger.info("MAP of adv[retrieval database]: {:.7f}".format(map))

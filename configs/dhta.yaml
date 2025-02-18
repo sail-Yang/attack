@@ -9,6 +9,7 @@ momentum: 0.9
 num_bits: 64
 batch_size: 32
 checkpoint: 10
+sample_checkpoint: 20
 
 ### Dataset params
 # coco/nuswide/flick/imagenet/cifar10/flickr
@@ -27,10 +28,10 @@ attack_method: "dhta"
 n_t: 9
 epsilon: 0.03
 iteration: 1
-transfer: False
+transfer: True
 trans_config:
-  t_hash_model: "DPSH"
-  t_bit: 32
+  t_hash_model: "CSQ"
+  t_bit: 64
   t_backbone: "VGG11"
 
 ### other configs

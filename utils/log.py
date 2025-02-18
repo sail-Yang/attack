@@ -43,7 +43,10 @@ def create_attack_hashing_logger(args):
   log_dir_path = os.path.join(logger_file_path, attack_method, hash_model)
   if not os.path.exists(log_dir_path):
     os.makedirs(log_dir_path)
-  log_name = f"{backbone}_{dataset}_{num_bits}_{log_time}.log"
+  if args.transfer:
+    log_name = f"transfer_{backbone}_{dataset}_{num_bits}_{log_time}.log"
+  else:
+    log_name = f"{backbone}_{dataset}_{num_bits}_{log_time}.log"
   log_path = os.path.join(logger_file_path, attack_method, hash_model, log_name)
   
   logger = logging.getLogger() 

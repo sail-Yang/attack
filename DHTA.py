@@ -25,7 +25,7 @@ def config_dhta(args):
   '''
   if args.n_t == 1:
     args.attack_method = "p2p"
-  hashModel = HashModel(args)
+  hashModel = HashModel(args, args.hash_model, args.backbone, args.num_bits)
   hashModel.load_model()
   model = hashModel.model.cuda()
   database_code_path = os.path.join(args.save_path, args.attack_method, "database_code_{}_{}_{}_{}.txt".format(args.dataset, args.hash_model, args.backbone, args.num_bits))
@@ -33,8 +33,11 @@ def config_dhta(args):
     t_hash_model = args.trans_config.t_hash_model
     t_bit = args.trans_config.t_bit
     t_backbone = args.trans_config.t_backbone
-    t_model_path = os.path.join(args.hash_save_path, t_hash_model, '{}_{}_{}_{}.pt'.format(t_hash_model, t_backbone, t_bit))
-    t_model = HashModel.load_t_model(t_model_path)
+    logger.info("target model: {} {} {}".format(t_hash_model, t_backbone, t_bit))
+    
+    t_model = HashModel(args, t_hash_model, t_backbone, t_bit)
+    t_model.load_model()
+    t_model = t_model.model.cuda()
   else:
     t_hash_model = args.hash_model
     t_bit = args.num_bits
@@ -185,6 +188,13 @@ if __name__ == "__main__":
       anchor_codes[i, :] = anchor_code
     query_anchor_codes[it*args.batch_size:it*args.batch_size+batch_size_] = anchor_codes.numpy()
     query_adv = target_hash_adv(model, image, anchor_codes.cuda(), epsilon=args.epsilon, iteration=args.iteration)
+    
+    if it % args.sample_checkpoint == 0:
+      dir_path = os.path.join(args.save_path, args.attack_method, "sample")
+      sample_img(image, dir_path, "{}_ori".format(it))
+      sample_img(query_adv, dir_path, "{}_adv".format(it))
+    
+    # 迁移性测试
     if args.transfer:
       query_code = generateHash(t_model, query_adv)
     else:
@@ -203,6 +213,6 @@ logger.info("perceptibility: {:.7f}".format(torch.sqrt(perceptibility/num_test))
 anchor_map = CalcTopMap(t_database_hash, query_anchor_codes, database_labels_int, target_labels, topk=args.topK)
 logger.info("anchor codes t-MAP[retrieval database]: {:.7f}".format(anchor_map))
 t_map = CalcTopMap(t_database_hash, qB, database_labels_int, target_labels, topk=args.topK)
-logger.info("t-MAP[retrieval database]: {:.7f}".format(t_map))
+logger.info("t-MAP of adv[retrieval database]: {:.7f}".format(t_map))
 map = CalcTopMap(t_database_hash, qB, database_labels_int, test_labels_int, topk=args.topK)
-logger.info("MAP[retrieval database]: {:.7f}".format(map))
+logger.info("MAP of adv[retrieval database]: {:.7f}".format(map))

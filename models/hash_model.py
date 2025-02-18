@@ -111,19 +111,21 @@ class DPSHLoss(nn.Module):
     return likelihood_loss + quantization_loss
 
 class HashModel:
-  def __init__(self, args):
+  def __init__(self, args, hash_model="DPSH", backbone="ResNet50", num_bits=64):
     super().__init__()
     self.args = args
-    self.model_name = args.hash_model
+    self.model_name = hash_model
+    self.backbone = backbone
+    self.num_bits = num_bits
     self.build_model()
   
   def build_model(self):
-    if "ResNet" in self.args.backbone:
-      self.model = ResNet(self.args.num_bits,self.args.backbone)
-    elif "VGG" in self.args.backbone:
-      self.model = VGG(self.args.num_bits, self.args.backbone)
-    elif "AlexNet" in self.args.backbone:
-      self.model = AlexNet(self.args.num_bits)
+    if "ResNet" in self.backbone:
+      self.model = ResNet(self.num_bits,self.backbone)
+    elif "VGG" in self.backbone:
+      self.model = VGG(self.num_bits, self.backbone)
+    elif "AlexNet" in self.backbone:
+      self.model = AlexNet(self.num_bits)
     else:
       raise NotImplementedError
   
@@ -135,9 +137,9 @@ class HashModel:
       critertion = HashNetLoss(alpha = alpha)
     elif self.model_name == "CSQ":
       lambda_ = self.args.csq_params.lambda_
-      critertion = CSQLoss(self.args.n_class, self.args.num_bits, lambda_)
+      critertion = CSQLoss(self.args.n_class, self.num_bits, lambda_)
     elif self.model_name == "DPSH":
-      critertion = DPSHLoss(self.args.n_class, self.args.dpsh_params.num_train, self.args.num_bits, self.args.dpsh_params.alpha)
+      critertion = DPSHLoss(self.args.n_class, self.args.dpsh_params.num_train, self.num_bits, self.args.dpsh_params.alpha)
     else:
       raise NotImplementedError
     
@@ -173,7 +175,7 @@ class HashModel:
         if map_ > best_mAP:
           best_mAP = map_
           # save the paramters of the model
-          file_name = f"{self.model_name}_{self.args.backbone}_{self.args.dataset}_{str(self.args.num_bits)}.pt"
+          file_name = f"{self.model_name}_{self.backbone}_{self.args.dataset}_{str(self.num_bits)}.pt"
           dir_path = os.path.join(save_path, self.model_name)
           if not os.path.exists(dir_path):
             os.makedirs(dir_path)
@@ -184,24 +186,13 @@ class HashModel:
   
   def load_model(self):
     file_name = (
-      f"{self.model_name}_{self.args.backbone}_{self.args.dataset}_{str(self.args.num_bits)}.pt"
+      f"{self.model_name}_{self.backbone}_{self.args.dataset}_{str(self.num_bits)}.pt"
     )
     save_path = self.args.hash_save_path
-    path = os.path.join(save_path, self.args.hash_model, file_name)
+    path = os.path.join(save_path, self.model_name, file_name)
     checkpoint = torch.load(path)
     self.model.load_state_dict(checkpoint)
     self.model.eval()
-
-  @staticmethod
-  def load_t_model(model_path):
-    '''
-    load attacked model
-    '''
-    model = torch.load(model_path)
-    if torch.cuda.is_available():
-      model = model.cuda()
-    model.eval()
-    return model
 
   def test_model(self, test_loader, database_loader):
     model = self.model.eval().cuda()
