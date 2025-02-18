@@ -34,11 +34,11 @@ replace: False
 multi: False
 # in/out-of-classes case
 in_class: True
-transfer: False
+transfer: True
 trans_config:
   t_hash_model: "DPSH"
-  t_bit: 32
-  t_backbone: "VGG11"
+  t_bit: 64
+  t_backbone: "ResNet50"
 
 ### other configs
 log_path: "./log/attack"
