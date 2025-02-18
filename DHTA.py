@@ -188,6 +188,12 @@ if __name__ == "__main__":
       anchor_codes[i, :] = anchor_code
     query_anchor_codes[it*args.batch_size:it*args.batch_size+batch_size_] = anchor_codes.numpy()
     query_adv = target_hash_adv(model, image, anchor_codes.cuda(), epsilon=args.epsilon, iteration=args.iteration)
+    
+    if it % args.sample_checkpoint == 0:
+      dir_path = os.path.join(args.save_path, args.attack_method, "sample")
+      sample_img(image, dir_path, "{}_ori".format(it))
+      sample_img(query_adv, dir_path, "{}_adv".format(it))
+    
     # 迁移性测试
     if args.transfer:
       query_code = generateHash(t_model, query_adv)

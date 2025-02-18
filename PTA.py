@@ -202,7 +202,12 @@ def evaluate(args, model, t_model, database_hash):
     
     a, _ = target_adv(query=query, model=model, pos_hash=pos_train_hash, neg_hash=neg_train_hash,
                       pos_num=pos_train_hash.shape[0], epsilon=args.epsilon, iteration=args.iteration)
-   
+
+    if it % args.sample_checkpoint == 0:
+      dir_path = os.path.join(args.save_path, args.attack_method, "sample")
+      sample_img(query, dir_path, "{}_ori".format(it))
+      sample_img(a, dir_path, "{}_adv".format(it))
+    
     clean_labelL.append(label.cpu().detach())
     if args.transfer:
       # transfer test

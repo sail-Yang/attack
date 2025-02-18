@@ -246,6 +246,13 @@ if __name__ == "__main__":
       query_code = generateHash(t_model, query_adv)
     else:
       query_code = generateHash(model, query_adv)
+    
+    # 采样图像
+    if it % args.sample_checkpoint == 0:
+      dir_path = os.path.join(args.save_path, args.attack_method, "sample")
+      sample_img(image, dir_path, "{}_ori".format(it))
+      sample_img(query_adv, dir_path, "{}_adv".format(it))
+      
     # 生成索引数组
     u_ind = np.linspace(it * args.batch_size, np.min((num_test, (it+1) * args.batch_size)) - 1, batch_size_, dtype=int)
     qB[u_ind, :] = query_code

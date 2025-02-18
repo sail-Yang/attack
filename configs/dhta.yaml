@@ -9,6 +9,7 @@ momentum: 0.9
 num_bits: 64
 batch_size: 32
 checkpoint: 10
+sample_checkpoint: 20
 
 ### Dataset params
 # coco/nuswide/flick/imagenet/cifar10/flickr
