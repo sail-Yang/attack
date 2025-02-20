@@ -19,13 +19,13 @@ crop_size: 224
 num_workers: 4
 topK: 5000
 n_class: 10
-data_path: "/opt/data/private/workspace/fyang/data"
+data_path: "/data2/fyang/data"
 txt_path: "./data/"
 
 ### attack settings
 hash_model: "DPSH"
-attack_method: "pros_gan"
-train: False
+attack_method: "tsaa_pros_gan"
+train: True
 test: True
 # lsgan/vanilla/wgangp
 gan_mode: "lsgan"

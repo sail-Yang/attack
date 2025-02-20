@@ -171,6 +171,7 @@ if __name__ == "__main__":
   query_anchor_codes = np.zeros((num_test, args.num_bits), dtype=np.float32)
   perceptibility = 0
   
+  l0_norm_mean = 0
   for it, data in enumerate(test_loader):
     image, label, ind = data
     image = image.cuda()
@@ -188,6 +189,12 @@ if __name__ == "__main__":
       anchor_codes[i, :] = anchor_code
     query_anchor_codes[it*args.batch_size:it*args.batch_size+batch_size_] = anchor_codes.numpy()
     query_adv = target_hash_adv(model, image, anchor_codes.cuda(), epsilon=args.epsilon, iteration=args.iteration)
+    
+    # calculate l-0 norm
+    diff = torch.ne(image, query_adv)
+    l0_norm = torch.sum(diff).item()
+    total_pixels = image.numel()
+    l0_norm_mean += l0_norm / total_pixels * batch_size_
     
     if it % args.sample_checkpoint == 0:
       dir_path = os.path.join(args.save_path, args.attack_method, "sample")
@@ -209,7 +216,9 @@ database_labels_int = get_labels_int(database_txt_path)
 test_txt_path = os.path.join(args.txt_path, "test_label.txt")
 test_labels_int = get_labels_int(test_txt_path)
 
+
 logger.info("perceptibility: {:.7f}".format(torch.sqrt(perceptibility/num_test)))
+logger.info("L0 norm: {:.7f}".format(l0_norm_mean / num_test))
 anchor_map = CalcTopMap(t_database_hash, query_anchor_codes, database_labels_int, target_labels, topk=args.topK)
 logger.info("anchor codes t-MAP[retrieval database]: {:.7f}".format(anchor_map))
 t_map = CalcTopMap(t_database_hash, qB, database_labels_int, target_labels, topk=args.topK)

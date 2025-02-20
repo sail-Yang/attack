@@ -7,7 +7,7 @@ from utils.data_provider import get_data
 from utils.log import create_attack_hashing_logger
 from utils.util import *
 from utils.validate import CalcTopMap
-from models.GAN import *
+from models.TSAA_GAN import *
 from models.prototypeNet import PrototypeNet
 from models.hash_model import HashModel
 
@@ -69,7 +69,7 @@ class TargetAttackGAN(nn.Module):
     else:
       self.train_prototype_net(database_loader, target_labels, train_labels, num_train)
     self.prototype_net.eval()
-    self.test_prototype(target_labels, database_loader, database_labels, num_database, num_test)
+    # self.test_prototype(target_labels, database_loader, database_labels, num_database, num_test)
   
     total_epochs = self.args.n_epochs + self.args.n_epochs_decay + 1
     for epoch in range(self.args.epoch_count, total_epochs):
@@ -84,7 +84,7 @@ class TargetAttackGAN(nn.Module):
         
         feature, target_hash_l, _ = self.prototype_net(batch_target_label)
         target_hash_l = torch.sign(target_hash_l.detach())
-        fake_g, _ = self.generator(real_input, feature.detach())
+        fake_g, x_r, x_0, x_m = self.generator(real_input, feature.detach())
         
         # Update D
         if i % 3 == 0:
@@ -104,27 +104,39 @@ class TargetAttackGAN(nn.Module):
         optimizer_gen.zero_grad()
         fake_g_d = self.discriminator(fake_g)
         fake_g_loss = self.criterionGAN(fake_g_d, batch_target_label, True)
-        reconstruction_loss = criterion_l2(fake_g, real_input)
+        # reconstruction_loss = criterion_l2(fake_g, real_input)
         target_hashing_g = self.hashModel((fake_g + 1) / 2)
         logloss = target_hashing_g * target_hash_l
         logloss = torch.mean(logloss)
         logloss = (-logloss + 1)
+        # l1 loss
+        l1_loss = torch.norm(x_0, 1)
+        # binary loss
+        bin_x_m = torch.where(x_m < 0.5, torch.zeros_like(x_m), torch.ones_like(x_m))
+        qua_loss = torch.sum((bin_x_m - x_m)**2)
         
         # backpropagation
-        g_loss = self.rec_w * reconstruction_loss + 5*logloss + self.dis_w*fake_g_loss
+        # g_loss = self.rec_w * reconstruction_loss + 5*logloss + self.dis_w*fake_g_loss + 0.0001 * l1_loss + 0.0001 * qua_loss
+        g_loss = 5*logloss + self.dis_w*fake_g_loss + 0.001 * l1_loss + 0.001 * qua_loss
         g_loss.backward()
         optimizer_gen.step()
         
         if i % self.args.sample_checkpoint == 0:
-          dir_path = os.path.join(self.args.save_path, self.args.attack_method, "sample")
-          sample_img(fake_g, dir_path, str(epoch) + '_' + str(i) + '_fake')
-          sample_img(real_input, dir_path, str(epoch) + '_' + str(i) + '_real')
+          now = time.strftime("%Y-%m-%d_%H:%M:%S", time.localtime())
+          dir_path = os.path.join(self.args.save_path, self.args.attack_method, "sample_{}".format(now))
+          sample_img_all(real_input, fake_g, x_0, dir_path, str(epoch) + '_' + str(i))
+          # sample_img(fake_g, dir_path, str(epoch) + '_' + str(i) + '_fake')
+          # sample_img(real_input, dir_path, str(epoch) + '_' + str(i) + '_real')
         
         if i % self.args.checkpoint == 0:
           
+          # logger.info(
+          #   'step: {:3d} g_loss: {:.3f} d_loss: {:.3f} hash_loss: {:.3f} r_loss: {:.7f} l1_loss: {:.7f} qua_loss: {:.7f}'
+          #               .format(i, fake_g_loss, d_loss, logloss, reconstruction_loss, l1_loss, qua_loss)
+          # )
           logger.info(
-            'step: {:3d} g_loss: {:.3f} d_loss: {:.3f} hash_loss: {:.3f} r_loss: {:.7f}'
-                        .format(i, fake_g_loss, d_loss, logloss, reconstruction_loss)
+            'step: {:3d} g_loss: {:.3f} d_loss: {:.3f} hash_loss: {:.3f} l1_loss: {:.7f} qua_loss: {:.7f}'
+                        .format(i, fake_g_loss, d_loss, logloss, l1_loss, qua_loss)
           )
       self.update_learning_rate()
     self.save_generator()
@@ -174,56 +186,6 @@ class TargetAttackGAN(nn.Module):
     database_labels_int = get_labels_int(database_txt_path)
     logger.info(f"perceptibility: {torch.sqrt(perceptibility/num_test):.7f}")
     logger.info("L0 norm: {:.7f}".format(l0_norm_mean / num_test))
-    t_map = CalcTopMap(database_hash, qB, database_labels_int, targeted_labels, topk=self.args.topK)
-    logger.info('t_MAP(retrieval database): %3.5f' % (t_map))
-    map_ = CalcTopMap(database_hash, qB, database_labels_int, test_labels, topk=self.args.topK)
-    logger.info('MAP(retrieval database): %3.5f' % (map_))
-  
-  def transfer_test(self, target_labels, database_loader, test_loader, database_labels, test_labels, num_database, num_test):
-    # load target hash model
-    self.t_hashModel = HashModel(self.args, args.trans_config.t_hash_model, args.trans_config.t_backbone, args.trans_config.t_bit)
-    self.t_hashModel.load_model()
-    self.t_hashModel = self.t_hashModel.model.cuda()
-    self.bit = self.args.trans_config.t_bit
-    
-    self.generator.eval()
-    self.prototype_net.eval()
-    
-    qB = np.zeros([num_test, self.bit])
-    targeted_labels = np.zeros([num_test, self.n_class])
-    
-    perceptibility = 0
-    start = time.time()
-    for it, data in enumerate(test_loader):
-      data_input, _, data_ind = data
-      select_index = np.random.choice(range(target_labels.size(0)), size=data_ind.size(0))
-      batch_target_label = target_labels.index_select(0, torch.from_numpy(select_index))
-      targeted_labels[data_ind.numpy(), :] = batch_target_label.numpy()
-      
-      data_input = self.set_input_images(data_input)
-      feature,_,_ = self.prototype_net(batch_target_label.cuda())
-      target_fake, _ = self.generator(data_input, feature)
-      target_fake = (target_fake + 1) / 2
-      data_input = (data_input + 1) / 2 
-      
-      target_hashing = self.t_hashModel(target_fake)
-      qB[data_ind.numpy(), :] = torch.sign(target_hashing.cpu().data).numpy()
-      
-      perceptibility += F.mse_loss(data_input, target_fake).data * data_ind.size(0)
-    end = time.time()
-    logger.info('Running time: %s Seconds'%(end-start))
-    np.savetxt(os.path.join(self.args.save_path, self.args.attack_method, "test_code_{}.txt".format(self.t_model_name)), qB, fmt="%d")
-    np.savetxt(os.path.join(self.args.save_path, self.args.attack_method, "target_label_{}.txt".format(self.t_model_name)), targeted_labels, fmt="%d")
-    # load database code
-    database_code_path = os.path.join(self.args.save_path, self.args.attack_method, "database_code_{}.txt".format(self.model_name))
-    if os.path.exists(database_code_path):
-      database_hash = np.loadtxt(database_code_path, dtype=np.float32)
-    else:
-      database_hash = generateCode(self.t_hashModel, database_loader, num_database, args.num_bits)
-      np.savetxt(database_code_path, database_hash, fmt="%d")
-    database_txt_path = os.path.join(self.args.txt_path, "database_label.txt")
-    database_labels_int = get_labels_int(database_txt_path)
-    logger.info(f"perceptibility: {torch.sqrt(perceptibility/num_test):.7f}")
     t_map = CalcTopMap(database_hash, qB, database_labels_int, targeted_labels, topk=self.args.topK)
     logger.info('t_MAP(retrieval database): %3.5f' % (t_map))
     map_ = CalcTopMap(database_hash, qB, database_labels_int, test_labels, topk=self.args.topK)
@@ -323,7 +285,7 @@ class TargetAttackGAN(nn.Module):
     
      
 if __name__ == "__main__":
-  conf_root = "./configs/pros_gan.yaml"
+  conf_root = "./configs/tsaa_pros_gan.yaml"
   args = load_config(conf_root)
   seed_setting(args.seed)
   logger = create_attack_hashing_logger(args)
@@ -346,9 +308,3 @@ if __name__ == "__main__":
     logger.info("testing...")
     model.load_all_model()
     model.test(target_labels, database_loader, test_loader, database_labels, test_labels, num_database, num_test)
-  
-  if args.transfer:
-    logger.info("transfer testing ...")
-    logger.info("target model: {} {} {}".format(args.trans_config.t_hash_model, args.trans_config.t_backbone, args.trans_config.t_bit))
-    model.load_all_model()
-    model.transfer_test(target_labels, database_loader, test_loader, database_labels, test_labels, num_database, num_test)

@@ -34,11 +34,9 @@ replace: False
 # general-target label selection
 multi: False
 # in/out-of-classes case
-<<<<<<< HEAD
-=======
 in_class: True
-transfer: True
->>>>>>> main
+
+transfer: False
 trans_config:
   t_hash_model: "DPSH"
   t_bit: 64

@@ -28,7 +28,7 @@ attack_method: "tha"
 n_t: 9
 epsilon: 0.03
 iteration: 1
-transfer: True
+transfer: False
 trans_config:
   t_hash_model: "DPSH"
   t_bit: 64

@@ -6,6 +6,7 @@ from tqdm import tqdm
 from torch.optim import lr_scheduler
 from torch.autograd import Variable
 from torchvision import transforms
+import torchvision.utils as vutils
 
 def seed_setting(seed=2021):
   """
@@ -98,9 +99,17 @@ def set_input_images(_input):
   _input = 2 * _input - 1
   return _input
 
-def sample_img(image, sample_dir, name):
+def sample_img(img, adv_img, sample_dir, name):
   if not os.path.exists(sample_dir):
     os.makedirs(sample_dir)
-  image = image.cpu().detach()[0]
-  image = transforms.ToPILImage()(image)
-  image.convert(mode='RGB').save(os.path.join(sample_dir, name + '.png'), quality=100)
+  vutils.save_image(vutils.make_grid(adv_img, normalize=True, scale_each=True), os.path.join(sample_dir, '{}_adv.png'.format(name)))
+  vutils.save_image(vutils.make_grid(img, normalize=True, scale_each=True), os.path.join(sample_dir, '{}_org.png'.format(name)))
+  vutils.save_image(vutils.make_grid(adv_img-img, normalize=True, scale_each=True), os.path.join(sample_dir, '{}_noise.png'.format(name)))
+def sample_img_all(img, adv_img, adv_bin, sample_dir, name):
+  if not os.path.exists(sample_dir):
+    os.makedirs(sample_dir)
+  adv_0_img = torch.where(adv_bin<0.5, torch.zeros_like(adv_bin), torch.ones_like(adv_bin)).clone().detach()
+  vutils.save_image(vutils.make_grid(adv_img, normalize=True, scale_each=True), os.path.join(sample_dir, '{}_adv.png'.format(name)))
+  vutils.save_image(vutils.make_grid(img, normalize=True, scale_each=True), os.path.join(sample_dir, '{}_org.png'.format(name)))
+  vutils.save_image(vutils.make_grid(adv_img-img, normalize=True, scale_each=True), os.path.join(sample_dir, '{}_noise.png'.format(name)))
+  vutils.save_image(vutils.make_grid(adv_0_img, normalize=True, scale_each=True), os.path.join(sample_dir, '{}_mask.png'.format(name)))

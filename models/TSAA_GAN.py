@@ -35,7 +35,7 @@ class Generator(nn.Module):
     Generator: Encoder-Decoder Architecture.
     Reference: https://github.com/yunjey/stargan/blob/master/model.py
   """
-  def __init__(self):
+  def __init__(self, eps=1.0, evaluate=False):
     super(Generator, self).__init__()
     # Label Encoder
     self.label_encoder = LabelEncoder()
@@ -62,52 +62,80 @@ class Generator(nn.Module):
       ]
       curr_dim = curr_dim * 2
     # Bottleneck
-    for i in range(3):
+    for i in range(6):
       image_encoder += [
         ResidualBlock(dim_in=curr_dim, dim_out=curr_dim, net_mode='t')
       ]
     self.image_encoder = nn.Sequential(*image_encoder)
     
-    
-    # Decoder
-    decoder = []
-    # Bottleneck
-    for i in range(3):
-      decoder += [
-        ResidualBlock(dim_in=curr_dim, dim_out=curr_dim, net_mode='t')
-      ]
-    
-    # Up Sampling
+    # r向量
+    curr_dim_r = curr_dim
+    r_decoder = []
     for i in range(2):
-      decoder += [
-        nn.ConvTranspose2d(curr_dim,
-                           curr_dim // 2,
-                           kernel_size=4,
+      r_decoder += [
+        nn.ConvTranspose2d(curr_dim_r,
+                           curr_dim_r // 2,
+                           kernel_size = 4,
                            stride=2,
                            padding=1,
-                           bias=False),
-        nn.InstanceNorm2d(curr_dim // 2),
+                           bias=False
+                           ),
+        nn.InstanceNorm2d(curr_dim_r // 2),
         nn.ReLU(inplace=True)
-      ]
-      curr_dim = curr_dim // 2
-    self.residual = nn.Sequential(
-      nn.Conv2d(curr_dim + 3,
-                  3,
-                  kernel_size=3,
-                  stride=1,
-                  padding=1,
-                  bias=False),
-      nn.Tanh()
-    )
-    self.decoder = nn.Sequential(*decoder)
+      ]      
+      curr_dim_r = curr_dim_r // 2
+    r_decoder += [
+      nn.ReflectionPad2d(3),
+      nn.Conv2d(curr_dim_r, 3, kernel_size=7, padding=0)
+    ]
+    self.r_decoder = nn.Sequential(*r_decoder)
+    
+    # m向量
+    curr_dim_m = curr_dim
+    m_decoder = []
+    for i in range(2):
+      m_decoder += [
+        nn.ConvTranspose2d(curr_dim_m,
+                           curr_dim_m // 2,
+                           kernel_size = 4,
+                           stride=2,
+                           padding=1,
+                           bias=False
+                           ),
+        nn.InstanceNorm2d(curr_dim_m // 2),
+        nn.ReLU(inplace=True)
+      ]      
+      curr_dim_m = curr_dim_m // 2
+    m_decoder += [
+      nn.ReflectionPad2d(3),
+      nn.Conv2d(curr_dim_m, 1, kernel_size=7, padding=0)
+    ]
+    self.m_decoder = nn.Sequential(*m_decoder)
+    
+    self.eps = eps
+    self.evaluate = evaluate
   
-  def forward(self, x, label_feature):
-    mixed_feature = self.label_encoder(x,label_feature)
+  def forward(self, input, label_feature):
+    mixed_feature = self.label_encoder(input,label_feature)
     encode = self.image_encoder(mixed_feature)
-    decode = self.decoder(encode)
-    decode_x = torch.cat([decode, x], dim=1)
-    adv_x = self.residual(decode_x)
-    return adv_x, mixed_feature
+    # encode [batch, 256, 56, 56]
+    
+    # 第一组，分量r，控制扰动大小
+    x_r = self.r_decoder(encode)
+    x_r = self.eps * torch.tanh(x_r) # [-eps, eps]
+    # x_r [batch, 3, 64 ,64]
+    # 第二组，分量m，控制扰动幅度
+    x_m = self.m_decoder(encode)
+    x_m = (torch.tanh(x_m) + 1) / 2 # 缩放到[0,1]
+    # [batch,1,224,224]
+    if self.evaluate:
+      x_0 = torch.where(x_m < 0.5, torch.zeros_like(x_m).detach(), torch.ones_like(x_m).detach())
+    else:
+      x_0 = torch.where(torch.rand(x_m.shape).cuda()<0.5, x_m, torch.where(x_m<0.5, torch.zeros_like(x_m), torch.ones_like(x_m)).detach())
+    # 最终生成的图像
+    # x_0[batch, 1, 224 224]
+    x_adv = torch.clamp(x_r * x_0 + input, min=0, max=1)
+    return x_adv, x_r, x_0, x_m
 
 class LabelEncoder(nn.Module):
   def __init__(self, nf=128):
@@ -152,7 +180,6 @@ class LabelEncoder(nn.Module):
 
     mixed_feature = torch.cat((label_feature, image), dim=1)
     return mixed_feature
-
 
 class ResidualBlock(nn.Module):
   """
@@ -249,3 +276,10 @@ class GANLoss(nn.Module):
       else:
         loss = prediction.mean()
     return loss
+
+if __name__ == '__main__':
+    netG = Generator()
+    test_sample = torch.rand(64, 3, 224, 224)
+    test_feature = torch.rand(64,512)
+    print('Generator output:', netG(test_sample, test_feature).size())
+    # print('Generator parameters:', sum(p.numel() for p in netG.parameters() if p.requires_grad))

@@ -229,7 +229,7 @@ if __name__ == "__main__":
     
     np.savetxt(target_label_path, targeted_labels, fmt="%d")
     
-  
+  l0_norm_mean = 0
   for it, data in enumerate(test_loader):
     image, label, ind = data
     batch_size_ = ind.size(0)
@@ -246,6 +246,12 @@ if __name__ == "__main__":
       query_code = generateHash(t_model, query_adv)
     else:
       query_code = generateHash(model, query_adv)
+    
+    # calculate l-0 norm
+    diff = torch.ne(image, query_adv)
+    l0_norm = torch.sum(diff).item()
+    total_pixels = image.numel()
+    l0_norm_mean += l0_norm / total_pixels * batch_size_
     
     # 采样图像
     if it % args.sample_checkpoint == 0:
@@ -266,6 +272,7 @@ test_txt_path = os.path.join(args.txt_path, "test_label.txt")
 test_labels_int = get_labels_int(test_txt_path)
 
 logger.info("perceptibility: {:.7f}".format(torch.sqrt(perceptibility/num_test)))
+logger.info("L0 norm: {:.7f}".format(l0_norm_mean / num_test))
 p_map = CalcMap(t_database_hash, query_prototype_codes, database_labels_int, targeted_labels)
 logger.info("prototype codes t-MAP[retrieval database]: {:.7f}".format(p_map))
 t_map = CalcMap(t_database_hash, qB, database_labels_int, targeted_labels)
