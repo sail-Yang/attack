@@ -39,6 +39,7 @@ class Generator(nn.Module):
     super(Generator, self).__init__()
     # Label Encoder
     self.label_encoder = LabelEncoder()
+    
     # Image Encoder
     curr_dim = 64
     image_encoder = [
@@ -46,6 +47,7 @@ class Generator(nn.Module):
       nn.InstanceNorm2d(curr_dim),
       nn.ReLU(inplace=True)
     ]
+    
     # Down Sampling
     for i in range(2):
       image_encoder += [
@@ -65,6 +67,7 @@ class Generator(nn.Module):
         ResidualBlock(dim_in=curr_dim, dim_out=curr_dim, net_mode='t')
       ]
     self.image_encoder = nn.Sequential(*image_encoder)
+    
     
     # Decoder
     decoder = []
