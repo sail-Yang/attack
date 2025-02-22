@@ -72,6 +72,7 @@ class TargetAttackGAN(nn.Module):
     self.test_prototype(target_labels, database_loader, database_labels, num_database, num_test)
   
     total_epochs = self.args.n_epochs + self.args.n_epochs_decay + 1
+    now = time.strftime("%Y-%m-%d_%H:%M:%S", time.localtime())
     for epoch in range(self.args.epoch_count, total_epochs):
       logger.info('Train epoch: {}, learning rate: {:.7f}'.format(epoch, self.lr))
       for i, data in enumerate(train_loader):
@@ -116,9 +117,8 @@ class TargetAttackGAN(nn.Module):
         optimizer_gen.step()
         
         if i % self.args.sample_checkpoint == 0:
-          dir_path = os.path.join(self.args.save_path, self.args.attack_method, "sample")
-          sample_img(fake_g, dir_path, str(epoch) + '_' + str(i) + '_fake')
-          sample_img(real_input, dir_path, str(epoch) + '_' + str(i) + '_real')
+          dir_path = os.path.join(self.args.save_path, self.args.attack_method, "sample_{}".format(now))
+          sample_img(real_input, fake_g, dir_path, str(epoch) + '_' + str(i))
         
         if i % self.args.checkpoint == 0:
           

@@ -11,6 +11,7 @@ from utils.util import *
 from utils.validate import CalcTopMap,CalcMap
 from models.prototypeNet import PrototypeNet
 import collections
+import time
 import pandas as pd
 
 torch.multiprocessing.set_sharing_strategy("file_system")
@@ -230,6 +231,7 @@ if __name__ == "__main__":
     np.savetxt(target_label_path, targeted_labels, fmt="%d")
     
   l0_norm_mean = 0
+  now = time.strftime("%Y-%m-%d_%H:%M:%S", time.localtime())
   for it, data in enumerate(test_loader):
     image, label, ind = data
     batch_size_ = ind.size(0)
@@ -255,9 +257,8 @@ if __name__ == "__main__":
     
     # 采样图像
     if it % args.sample_checkpoint == 0:
-      dir_path = os.path.join(args.save_path, args.attack_method, "sample")
-      sample_img(image, dir_path, "{}_ori".format(it))
-      sample_img(query_adv, dir_path, "{}_adv".format(it))
+      dir_path = os.path.join(args.save_path, args.attack_method, "sample_{}".format(now))
+      sample_img(image, query_adv, dir_path, str(it))
       
     # 生成索引数组
     u_ind = np.linspace(it * args.batch_size, np.min((num_test, (it+1) * args.batch_size)) - 1, batch_size_, dtype=int)

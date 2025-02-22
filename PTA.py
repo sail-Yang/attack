@@ -10,6 +10,7 @@ from utils.log import create_attack_hashing_logger
 from utils.util import *
 from utils.validate import CalcTopMap,CalcMap
 import collections
+import time
 import pandas as pd
 from torch.utils.data.sampler import SequentialSampler
 from torch.utils.data.dataloader import DataLoader
@@ -182,6 +183,7 @@ def evaluate(args, model, t_model, database_hash):
   
   perceptibility = 0
   l0_norm_mean = 0
+  now = time.strftime("%Y-%m-%d_%H:%M:%S", time.localtime())
   for it, data in (enumerate(tqdm(test_loader))):
     query = data[0].cuda()
     label = data[1]
@@ -214,9 +216,8 @@ def evaluate(args, model, t_model, database_hash):
                       pos_num=pos_train_hash.shape[0], epsilon=args.epsilon, iteration=args.iteration)
 
     if it % args.sample_checkpoint == 0:
-      dir_path = os.path.join(args.save_path, args.attack_method, "sample")
-      sample_img(query, dir_path, "{}_ori".format(it))
-      sample_img(a, dir_path, "{}_adv".format(it))
+      dir_path = os.path.join(args.save_path, args.attack_method, "sample_{}".format(now))
+      sample_img(query, a, dir_path, str(it))
     
     clean_labelL.append(label.cpu().detach())
     if args.transfer:

@@ -8,6 +8,7 @@ from utils.log import create_attack_hashing_logger
 from utils.util import *
 from utils.validate import CalcTopMap
 import collections
+import time
 import pandas as pd
 
 torch.multiprocessing.set_sharing_strategy("file_system")
@@ -172,6 +173,7 @@ if __name__ == "__main__":
   perceptibility = 0
   
   l0_norm_mean = 0
+  now = time.strftime("%Y-%m-%d_%H:%M:%S", time.localtime())
   for it, data in enumerate(test_loader):
     image, label, ind = data
     image = image.cuda()
@@ -197,9 +199,8 @@ if __name__ == "__main__":
     l0_norm_mean += l0_norm / total_pixels * batch_size_
     
     if it % args.sample_checkpoint == 0:
-      dir_path = os.path.join(args.save_path, args.attack_method, "sample")
-      sample_img(image, dir_path, "{}_ori".format(it))
-      sample_img(query_adv, dir_path, "{}_adv".format(it))
+      dir_path = os.path.join(args.save_path, args.attack_method, "sample_{}".format(now))
+      sample_img(image, query_adv, dir_path, str(it))
     
     # 迁移性测试
     if args.transfer:
