@@ -54,7 +54,7 @@ class HashingDataset(Dataset):
     return img, label, index
   
   def __len__(self):
-    return len(self.img_filename_list)
+    return len(self.img_list)
 
 def image_transform(resize_size, crop_size, is_train=True):
   '''
